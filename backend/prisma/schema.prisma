@@ -1,0 +1,156 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      UserRole @default(ADMIN)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Member {
+  id             String         @id @default(cuid())
+  name           String
+  age            Int
+  gender         Gender
+  email         String         @unique
+  phone         String
+  membershipType MembershipType
+  expiryDate    DateTime
+  status        MemberStatus   @default(ACTIVE)
+  profilePicture String?
+  joinDate      DateTime       @default(now())
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  // Relations
+  checkIns      CheckIn[]
+  payments      Payment[]
+  workouts      Workout[]
+
+  @@map("members")
+}
+
+model CheckIn {
+  id        String   @id @default(cuid())
+  memberId  String
+  checkInAt DateTime @default(now())
+  checkOutAt DateTime?
+  notes     String?
+  
+  // Relations
+  member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@map("check_ins")
+}
+
+model Payment {
+  id          String        @id @default(cuid())
+  memberId    String
+  amount      Float
+  paymentType PaymentType
+  status      PaymentStatus @default(PENDING)
+  dueDate    DateTime
+  paidAt     DateTime?
+  notes      String?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  // Relations
+  member     Member        @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+model Workout {
+  id          String      @id @default(cuid())
+  memberId    String
+  workoutType WorkoutType
+  duration    Int         // in minutes
+  calories   Int?
+  notes      String?
+  workoutAt  DateTime     @default(now())
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  // Relations
+  member     Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@map("workouts")
+}
+
+model MembershipPlan {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  price       Float
+  duration    Int      // in days
+  features    String[] // array of features
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("membership_plans")
+}
+
+// Enums
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  STAFF
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum MembershipType {
+  ONE_MONTH
+  THREE_MONTH
+  SIX_MONTH
+  ONE_YEAR
+}
+
+enum MemberStatus {
+  ACTIVE
+  INACTIVE
+  EXPIRING_SOON
+  ARCHIVED
+}
+
+enum PaymentType {
+  MEMBERSHIP
+  PERSONAL_TRAINING
+  CLASS
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum WorkoutType {
+  CARDIO
+  STRENGTH
+  FLEXIBILITY
+  SPORTS
+  OTHER
+}
+
