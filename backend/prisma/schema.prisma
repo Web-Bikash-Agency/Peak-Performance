@@ -25,33 +25,29 @@ model Member {
   name           String
   age            Int
   gender         Gender
-  email         String         @unique
-  phone         String
+  email          String         @unique
+  phone          String
   membershipType MembershipType
-  expiryDate    DateTime
-  status        MemberStatus   @default(ACTIVE)
+  expiryDate     DateTime
+  status         MemberStatus   @default(ACTIVE)
   profilePicture String?
-  joinDate      DateTime       @default(now())
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-
-  // Relations
-  checkIns      CheckIn[]
-  payments      Payment[]
-  workouts      Workout[]
+  joinDate       DateTime       @default(now())
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  checkIns       CheckIn[]
+  payments       Payment[]
+  workouts       Workout[]
 
   @@map("members")
 }
 
 model CheckIn {
-  id        String   @id @default(cuid())
-  memberId  String
-  checkInAt DateTime @default(now())
+  id         String    @id @default(cuid())
+  memberId   String
+  checkInAt  DateTime  @default(now())
   checkOutAt DateTime?
-  notes     String?
-  
-  // Relations
-  member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  notes      String?
+  member     Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
   @@map("check_ins")
 }
@@ -62,14 +58,12 @@ model Payment {
   amount      Float
   paymentType PaymentType
   status      PaymentStatus @default(PENDING)
-  dueDate    DateTime
-  paidAt     DateTime?
-  notes      String?
-  createdAt  DateTime       @default(now())
-  updatedAt  DateTime       @updatedAt
-
-  // Relations
-  member     Member        @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  dueDate     DateTime
+  paidAt      DateTime?
+  notes       String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  member      Member        @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
   @@map("payments")
 }
@@ -78,15 +72,13 @@ model Workout {
   id          String      @id @default(cuid())
   memberId    String
   workoutType WorkoutType
-  duration    Int         // in minutes
-  calories   Int?
-  notes      String?
-  workoutAt  DateTime     @default(now())
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
-
-  // Relations
-  member     Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  duration    Int
+  calories    Int?
+  notes       String?
+  workoutAt   DateTime    @default(now())
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  member      Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
   @@map("workouts")
 }
@@ -96,8 +88,8 @@ model MembershipPlan {
   name        String
   description String?
   price       Float
-  duration    Int      // in days
-  features    String[] // array of features
+  duration    Int
+  features    String[]
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -105,7 +97,6 @@ model MembershipPlan {
   @@map("membership_plans")
 }
 
-// Enums
 enum UserRole {
   SUPER_ADMIN
   ADMIN
@@ -153,4 +144,3 @@ enum WorkoutType {
   SPORTS
   OTHER
 }
-
