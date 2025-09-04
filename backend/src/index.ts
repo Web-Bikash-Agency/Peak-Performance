@@ -110,6 +110,7 @@ process.on('SIGINT', async () => {
 const startServer = async () => {
   try {
     // Test database connection
+    console.log("Connecting to DB...")
     await prisma.$connect();
     console.log('✅ Database connected successfully');
 
