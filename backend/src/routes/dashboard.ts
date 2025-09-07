@@ -23,14 +23,14 @@ router.get('/overview', async (req, res, next) => {
     });
 
     // Get expiring soon members count (within 30 days)
-    const thirtyDaysFromNow = new Date();
-    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+    const fifteenDaysFromNow = new Date();
+    fifteenDaysFromNow.setDate(fifteenDaysFromNow.getDate() + 15);
 
     const expiringSoon = await prisma.member.count({
       where: {
         status: 'ACTIVE',
         expiryDate: {
-          lte: thirtyDaysFromNow,
+          lte: fifteenDaysFromNow,
           gte: new Date()
         }
       }

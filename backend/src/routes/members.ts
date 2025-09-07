@@ -189,12 +189,12 @@ router.post('/', validateMember, async (req: Request, res: Response, next: NextF
     // Set status based on expiry date
     const expiryDate = new Date(memberData.expiryDate);
     const now = new Date();
-    const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const fifteenDaysFromNow = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
 
     let status = 'ACTIVE';
     if (expiryDate <= now) {
       status = 'INACTIVE';
-    } else if (expiryDate <= thirtyDaysFromNow) {
+    } else if (expiryDate <= fifteenDaysFromNow) {
       status = 'EXPIRING_SOON';
     }
 
@@ -256,11 +256,11 @@ router.put('/:id', validateMemberUpdate, async (req: Request, res: Response, nex
     if (updateData.expiryDate) {
       const expiryDate = new Date(updateData.expiryDate);
       const now = new Date();
-      const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const fifteenDaysFromNow = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
 
       if (expiryDate <= now) {
         updateData.status = 'INACTIVE';
-      } else if (expiryDate <= thirtyDaysFromNow) {
+      } else if (expiryDate <= fifteenDaysFromNow) {
         updateData.status = 'EXPIRING_SOON';
       } else {
         updateData.status = 'ACTIVE';
