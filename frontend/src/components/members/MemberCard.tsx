@@ -70,7 +70,7 @@ export function MemberCard({ member, onEdit, onArchive, onDelete, onActivate, on
             <div>
               <h3 className="font-semibold text-lg flex items-center gap-2">
                 {member.name}
-                {member.membershipType === '1 year' && (
+                {member.membershipType === 'ONE_YEAR' && (
                   <Crown className="w-4 h-4 text-warning" />
                 )}
               </h3>
@@ -113,7 +113,7 @@ export function MemberCard({ member, onEdit, onArchive, onDelete, onActivate, on
         </div>
 
         <div className="flex items-center justify-between">
-          <Badge variant={member.membershipType === '1 year' ? 'default' : 'secondary'}>
+          <Badge variant={member.membershipType === 'ONE_YEAR' ? 'default' : 'secondary'}>
             {member.membershipType}
           </Badge>
           
