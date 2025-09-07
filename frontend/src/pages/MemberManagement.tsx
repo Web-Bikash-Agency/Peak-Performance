@@ -248,13 +248,23 @@ export default function MemberManagement() {
       />
 
       {/* Add/Edit Member Form */}
-      {isAddMemberOpen && (
+      {/* {isAddMemberOpen && (
         <AddMemberForm
           member={editingMember}
           onSubmit={editingMember ? handleUpdateMember : handleAddMember}
           onCancel={handleCloseForm}
         />
-      )}
+      )} */}
+
+      {/* Add/Edit Member Form */}
+{isAddMemberOpen && (
+  <AddMemberForm
+    isOpen={isAddMemberOpen}           // ✅ Correct prop name
+    onClose={handleCloseForm}          // ✅ Correct prop name  
+    onSave={editingMember ? handleUpdateMember : handleAddMember} // ✅ Correct prop name
+    editingMember={editingMember}      // ✅ Correct prop name
+  />
+)}
     </div>
   );
 }
