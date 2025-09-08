@@ -252,6 +252,20 @@ router.put('/:id', validateMemberUpdate, async (req: Request, res: Response, nex
       }
     }
 
+    if (updateData.status === 'ACTIVE' && existingMember.status === 'ARCHIVED') {
+  // When unarchiving, check if membership is still valid
+  const expiryDate = new Date(existingMember.expiryDate);
+  const now = new Date();
+  const fifteenDaysFromNow = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
+
+  if (expiryDate <= now) {
+    updateData.status = 'INACTIVE';
+  } else if (expiryDate <= fifteenDaysFromNow) {
+    updateData.status = 'EXPIRING_SOON';
+  }
+  // Otherwise keep ACTIVE
+}
+
     // Update status based on expiry date if it's being updated
     if (updateData.expiryDate) {
       const expiryDate = new Date(updateData.expiryDate);

@@ -2,7 +2,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Edit, Archive, Trash2, Mail, Phone, Calendar, Crown } from "lucide-react";
+import {
+  Edit,
+  Archive,
+  Trash2,
+  Mail,
+  Phone,
+  Calendar,
+  Crown,
+} from "lucide-react";
 import { Member } from "@/types/member";
 import { cn } from "@/lib/utils";
 import { MemberStatusSwitch } from "./MemberStatusSwitch";
@@ -16,61 +24,73 @@ interface MemberCardProps {
   onDeactivate: (id: string) => Promise<void>; // ✅ Added
 }
 
-export function MemberCard({ member, onEdit, onArchive, onDelete, onActivate, onDeactivate }: MemberCardProps) {
-  const getStatusVariant = (status: Member['status']) => {
+export function MemberCard({
+  member,
+  onEdit,
+  onArchive,
+  onDelete,
+  onActivate,
+  onDeactivate,
+}: MemberCardProps) {
+  const getStatusVariant = (status: Member["status"]) => {
     switch (status) {
-      case 'Active':
-        return 'default';
-      case 'Inactive':
-        return 'secondary';
-      case 'Expiring Soon':
-        return 'destructive';
-      case 'Archived':
-        return 'outline';
+      case "Active":
+        return "default";
+      case "Inactive":
+        return "secondary";
+      case "Expiring Soon":
+        return "destructive";
+      case "Archived":
+        return "outline";
       default:
-        return 'secondary';
+        return "secondary";
     }
   };
 
-  const getStatusColor = (status: Member['status']) => {
+  const getStatusColor = (status: Member["status"]) => {
     switch (status) {
-      case 'Active':
-        return 'bg-accent text-accent-foreground';
-      case 'Inactive':
-        return 'bg-muted text-muted-foreground';
-      case 'Expiring Soon':
-        return 'bg-warning text-warning-foreground';
-      case 'Archived':
-        return 'bg-destructive/20 text-destructive';
+      case "Active":
+        return "bg-accent text-accent-foreground";
+      case "Inactive":
+        return "bg-muted text-muted-foreground";
+      case "Expiring Soon":
+        return "bg-warning text-warning-foreground";
+      case "Archived":
+        return "bg-destructive/20 text-destructive";
       default:
-        return 'bg-muted text-muted-foreground';
+        return "bg-muted text-muted-foreground";
     }
   };
 
   const expiryDate = new Date(member.expiryDate);
 
-  const daysUntilExpiry = Math.ceil(
-    expiryDate.getTime() - new Date().getTime()
-  ) / (1000 * 60 * 60 * 24);
+  const daysUntilExpiry =
+    Math.ceil(expiryDate.getTime() - new Date().getTime()) /
+    (1000 * 60 * 60 * 24);
 
   return (
-    <Card className={cn(
-      "transition-all duration-300 hover:shadow-lg hover:scale-105 animate-scale-in",
-      member.status === 'Expiring Soon' && "ring-2 ring-warning/50"
-    )}>
+    <Card
+      className={cn(
+        "transition-all duration-300 hover:shadow-lg hover:scale-105 animate-scale-in",
+        member.status === "Expiring Soon" && "ring-2 ring-warning/50"
+      )}
+    >
       <CardContent className="p-6">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center space-x-3">
             <Avatar className="w-12 h-12 ring-2 ring-primary/20">
               <AvatarImage src={member.profilePicture} alt={member.name} />
               <AvatarFallback className="bg-gradient-primary text-primary-foreground font-bold">
-                {member.name.split(' ').map(n => n[0]).join('')}
+                {member.name
+                  .split(" ")
+                  .map((n) => n[0])
+                  .join("")}
               </AvatarFallback>
             </Avatar>
             <div>
               <h3 className="font-semibold text-lg flex items-center gap-2">
                 {member.name}
-                {member.membershipType === 'ONE_YEAR' && (
+                {member.membershipType === "ONE_YEAR" && (
                   <Crown className="w-4 h-4 text-warning" />
                 )}
               </h3>
@@ -113,10 +133,14 @@ export function MemberCard({ member, onEdit, onArchive, onDelete, onActivate, on
         </div>
 
         <div className="flex items-center justify-between">
-          <Badge variant={member.membershipType === 'ONE_YEAR' ? 'default' : 'secondary'}>
+          <Badge
+            variant={
+              member.membershipType === "ONE_YEAR" ? "default" : "secondary"
+            }
+          >
             {member.membershipType}
           </Badge>
-          
+
           <div className="flex space-x-1">
             <Button
               variant="ghost"
@@ -130,9 +154,22 @@ export function MemberCard({ member, onEdit, onArchive, onDelete, onActivate, on
               variant="ghost"
               size="sm"
               onClick={() => onArchive(member.id)}
-              className="hover:bg-muted/80"
+              className={
+                member.status === "ARCHIVED"
+                  ? "hover:bg-green-50 hover:text-green-600"
+                  : "hover:bg-muted/80"
+              }
+              title={
+                member.status === "ARCHIVED"
+                  ? "Unarchive Member"
+                  : "Archive Member"
+              }
             >
-              <Archive className="w-4 h-4" />
+              {member.status === "ARCHIVED" ? (
+                <Archive className="w-4 h-4 rotate-180" />
+              ) : (
+                <Archive className="w-4 h-4" />
+              )}
             </Button>
             <Button
               variant="ghost"

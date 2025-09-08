@@ -162,15 +162,34 @@ export default function MemberManagement() {
       toast({ variant: "destructive", title: "Error", description: error instanceof Error ? error.message : "Failed to delete member" });
     }
   };
-
   const handleArchiveMember = async (id: string) => {
-    try {
+  const member = members.find(m => m.id === id);
+  if (!member) return;
+
+  try {
+    if (member.status === 'ARCHIVED') {
+      // Unarchive - set back to ACTIVE
+      await apiUpdateMember(id, { status: 'ACTIVE' });
+      toast({ 
+        title: "Member Unarchived", 
+        description: "Member has been restored successfully." 
+      });
+    } else {
+      // Archive
       await apiUpdateMember(id, { status: 'ARCHIVED' });
-      toast({ title: "Member Archived", description: "Member has been archived successfully." });
-    } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: error instanceof Error ? error.message : "Failed to archive member" });
+      toast({ 
+        title: "Member Archived", 
+        description: "Member has been archived successfully." 
+      });
     }
-  };
+  } catch (error) {
+    toast({ 
+      variant: "destructive", 
+      title: "Error", 
+      description: error instanceof Error ? error.message : "Failed to update member status" 
+    });
+  }
+};
 
   // ✅ New handlers for activating/deactivating members
   const handleActivateMember = async (id: string) => {
