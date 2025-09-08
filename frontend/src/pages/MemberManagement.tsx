@@ -155,13 +155,30 @@ export default function MemberManagement() {
   };
 
   const handleDeleteMember = async (id: string) => {
-    try {
-      await apiDeleteMember(id);
-      toast({ variant: "destructive", title: "Member Deleted", description: "Member has been deleted permanently." });
-    } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: error instanceof Error ? error.message : "Failed to delete member" });
-    }
-  };
+  try {
+    // Find the member to check its status before deletion
+    const memberToDelete = members.find(member => member.id === id);
+    
+    await apiDeleteMember(id);
+    
+    // Show appropriate message based on whether it was archived or not
+    const message = memberToDelete?.status === "ARCHIVED" 
+      ? "Member has been permanently deleted."
+      : "Member has been Moved to archived, if you wanted to delete parmenently, delete from Archived";
+    
+    toast({ 
+      title: "Success", 
+      description: message,
+      variant: "default" // Use default variant for success
+    });
+  } catch (error) {
+    toast({ 
+      variant: "destructive", 
+      title: "Error", 
+      description: error instanceof Error ? error.message : "Failed to delete member" 
+    });
+  }
+};
   const handleArchiveMember = async (id: string) => {
   const member = members.find(m => m.id === id);
   if (!member) return;
@@ -265,15 +282,6 @@ export default function MemberManagement() {
         onDeactivate={handleDeactivateMember} // ✅ New prop
         onAdd={() => setIsAddMemberOpen(true)}
       />
-
-      {/* Add/Edit Member Form */}
-      {/* {isAddMemberOpen && (
-        <AddMemberForm
-          member={editingMember}
-          onSubmit={editingMember ? handleUpdateMember : handleAddMember}
-          onCancel={handleCloseForm}
-        />
-      )} */}
 
       {/* Add/Edit Member Form */}
 {isAddMemberOpen && (

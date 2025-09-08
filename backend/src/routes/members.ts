@@ -296,6 +296,7 @@ router.put('/:id', validateMemberUpdate, async (req: Request, res: Response, nex
   }
 });
 
+
 // Delete member
 router.delete('/:id', async (req, res, next) => {
   try {
@@ -314,16 +315,28 @@ router.delete('/:id', async (req, res, next) => {
       throw new NotFoundError('Member not found');
     }
 
-    // Soft delete by setting status to archived
-    await prisma.member.update({
-      where: { id },
-      data: { status: 'ARCHIVED' }
-    });
+    // If member is already archived, perform hard delete
+    if (member.status === 'ARCHIVED') {
+      await prisma.member.delete({
+        where: { id }
+      });
 
-    res.json({
-      success: true,
-      message: 'Member archived successfully'
-    });
+      res.json({
+        success: true,
+        message: 'Member permanently deleted from database'
+      });
+    } else {
+      // If not archived, perform soft delete (archive)
+      await prisma.member.update({
+        where: { id },
+        data: { status: 'ARCHIVED' }
+      });
+
+      res.json({
+        success: true,
+        message: 'Member archived successfully'
+      });
+    }
   } catch (error) {
     next(error);
   }

@@ -64,9 +64,10 @@ export function MemberCard({
 
   const expiryDate = new Date(member.expiryDate);
 
-  const daysUntilExpiry =
-    Math.ceil(expiryDate.getTime() - new Date().getTime()) /
-    (1000 * 60 * 60 * 24);
+  const daysUntilExpiry = Math.ceil(
+  (expiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+);
+
 
   return (
     <Card
