@@ -7,6 +7,7 @@ import { useDashboardData, useMembers } from "@/hooks/use-api";
 import { useAuth } from "@/contexts/AuthContext";
 import { Member } from "@/types/member";
 import { DashboardOverview } from "@/components/dashboard/DashboardOverview";
+import { Link } from "react-router-dom";
 
 const Index = () => {
   const { toast } = useToast();
@@ -95,22 +96,22 @@ const Index = () => {
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
       
       {/* Logo and Title Section */}
-      <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+      <Link to="/" className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1 cursor-pointer">
         <div className="bg-gradient-primary p-1.5 sm:p-2 rounded-lg shadow-glow flex-shrink-0">
           <Dumbbell className="w-6 h-6 sm:w-8 sm:h-8 text-primary-foreground" />
         </div>
         <div className="min-w-0 flex-1">
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent truncate cursor-default">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent truncate">
             FitCulture Admin
           </h1>
-          <p className="text-sm sm:text-base text-muted-foreground hidden sm:block cursor-default">
+          <p className="text-sm sm:text-base text-muted-foreground hidden sm:block">
             Gym Management System
           </p>
-          <p className="text-xs text-muted-foreground sm:hidden cursor-default">
+          <p className="text-xs text-muted-foreground sm:hidden">
             Gym Management
           </p>
         </div>
-      </div>
+        </Link>
       
       {/* Action Buttons Section */}
       <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end">
