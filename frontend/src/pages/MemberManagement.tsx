@@ -26,7 +26,6 @@ export default function MemberManagement() {
   
   // Handle local filter state updates
   const handleStatusFilterChange = (newFilter: string) => {
-    console.log("Filter changed to:", newFilter);
     
     // ✅ Map display names from Members component to internal filter values
     const filterMap: { [key: string]: string } = {
@@ -44,7 +43,6 @@ export default function MemberManagement() {
     };
     
     const mappedFilter = filterMap[newFilter] || newFilter.toLowerCase();
-    console.log("Mapped filter value:", mappedFilter);
     
     setStatusFilter(mappedFilter);
     setSearchTerm(""); // Clear search when changing filters
@@ -82,7 +80,6 @@ export default function MemberManagement() {
   }, [stats, members]);
 
   const filteredMembers = useMemo(() => {
-    console.log("🔍 FILTERING - Current statusFilter:", statusFilter);
     
     const filtered = members.filter(member => {
       // Search term matching
@@ -115,13 +112,6 @@ export default function MemberManagement() {
       
       return matchesSearch && matchesStatus && matchesMembership;
     });
-    
-    console.log(`✅ FILTERING RESULT: ${filtered.length}/${members.length} members match filter "${statusFilter}"`);
-    
-    // Log which members are shown for debugging
-    if (filtered.length > 0) {
-      console.log("Members shown:", filtered.map(m => `${m.name} (${m.status})`));
-    }
     
     return filtered;
   }, [members, searchTerm, statusFilter, membershipFilter]);
@@ -251,7 +241,6 @@ export default function MemberManagement() {
   };
 
   const handleCardClick = (filter: string) => {
-    console.log("Local filter button clicked:", filter);
     setStatusFilter(filter);
     setSearchTerm("");
     // Clear URL parameter when using local filters

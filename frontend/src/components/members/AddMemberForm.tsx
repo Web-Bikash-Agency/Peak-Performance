@@ -602,7 +602,6 @@ export function AddMemberForm({ isOpen, onClose, onSave, editingMember }: AddMem
       joinDate: editingMember?.joinDate || new Date()
     };
 
-    console.log('Sending member data:', memberData); // Debug log
     
     onSave(memberData);
     onClose();

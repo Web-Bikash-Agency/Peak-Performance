@@ -117,10 +117,6 @@ router.get('/monthly-stats', [
       ORDER BY month
     `;
 
-    // DEBUG: Log raw query results
-    console.log(`Raw monthly stats query result for ${year}:`, monthlyStats);
-    console.log(`Total members in database:`, await prisma.member.count());
-
     // Get monthly revenue
     const monthlyRevenue = await prisma.$queryRaw`
       SELECT 
@@ -174,14 +170,11 @@ router.get('/monthly-stats', [
       };
     });
 
-    console.log(`Monthly stats for ${year}:`, formattedStats); // Debug log
-
     res.json({
       success: true,
       data: formattedStats
     });
   } catch (error) {
-    console.error('Error fetching monthly stats:', error); // Debug log
     next(error);
   }
 });
