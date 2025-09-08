@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { MemberFilters } from "./MemberFilters";
 import { MemberCard } from "./MemberCard";
 import { Member } from "@/types/member";
+import { Link } from "react-router-dom";
 
 interface MembersProps {
   members: Member[];
@@ -45,10 +46,10 @@ export const Members = ({
 }: MembersProps) => {
   return (
     <section>
-      <h2 className="text-2xl font-bold mb-6 flex items-center gap-2 cursor-default">
+      <Link to="/" className="text-2xl font-bold mb-6 flex items-center gap-2 cursor-pointer">
         <Users className="w-6 h-6 text-primary" />
         Member Management
-      </h2>
+      </Link>
 
       <MemberFilters
         searchTerm={searchTerm}
