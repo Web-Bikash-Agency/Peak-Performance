@@ -25,7 +25,7 @@ model Member {
   name           String
   age            Int
   gender         Gender
-  email          String         @unique
+  email          String?         @unique
   phone          String
   membershipType MembershipType
   expiryDate     DateTime

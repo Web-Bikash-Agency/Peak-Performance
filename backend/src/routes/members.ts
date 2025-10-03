@@ -11,7 +11,7 @@ const validateMember = [
   body('name').trim().isLength({ min: 2 }).withMessage('Name must be at least 2 characters'),
   body('age').isInt({ min: 16, max: 100 }).withMessage('Age must be between 16 and 100'),
   body('gender').isIn(['MALE', 'FEMALE', 'OTHER']).withMessage('Invalid gender'),
-  body('email').isEmail().normalizeEmail(),
+  body('email').optional().isEmail().normalizeEmail(),
   body('phone').trim().isLength({ min: 10 }).withMessage('Phone number must be at least 10 characters'),
   body('membershipType').isIn(['ONE_MONTH', 'THREE_MONTH', 'SIX_MONTH', 'ONE_YEAR']).withMessage('Invalid membership type'),
   body('expiryDate').isISO8601().withMessage('Invalid expiry date')
@@ -47,7 +47,7 @@ router.get('/', [
 
     const {
       page = 1,
-      limit = 10,
+      limit = 1000,
       search,
       status,
       membershipType,
@@ -177,13 +177,20 @@ router.post('/', validateMember, async (req: Request, res: Response, next: NextF
 
     const memberData = req.body;
 
-    // Check if email already exists
-    const existingMember = await prisma.member.findUnique({
-      where: { email: memberData.email }
-    });
+    // Convert empty email to null
+    if (memberData.email === "") {
+      memberData.email = null;
+    }
 
-    if (existingMember) {
-      throw new ConflictError('Member with this email already exists');
+    // Check if email already exists (only if email is provided)
+    if (memberData.email) {
+      const existingMember = await prisma.member.findUnique({
+        where: { email: memberData.email }
+      });
+
+      if (existingMember) {
+        throw new ConflictError('Member with this email already exists');
+      }
     }
 
     // Set status based on expiry date
@@ -228,8 +235,9 @@ router.put('/:id', validateMemberUpdate, async (req: Request, res: Response, nex
     const { id } = req.params;
     const updateData = req.body;
 
-    if (!id) {
-      throw new BadRequestError('Member ID is required');
+    // Convert empty email to null
+    if (updateData.email === "") {
+      updateData.email = null;
     }
 
     // Check if member exists
