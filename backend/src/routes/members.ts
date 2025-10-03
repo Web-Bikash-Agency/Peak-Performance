@@ -235,9 +235,12 @@ router.put('/:id', validateMemberUpdate, async (req: Request, res: Response, nex
     const { id } = req.params;
     const updateData = req.body;
 
-    // Convert empty email to null
     if (updateData.email === "") {
       updateData.email = null;
+    }
+
+    if (!id) {
+      throw new BadRequestError('Member ID is required');
     }
 
     // Check if member exists
