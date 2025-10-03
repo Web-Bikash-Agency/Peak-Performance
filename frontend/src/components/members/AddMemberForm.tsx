@@ -251,7 +251,7 @@ useEffect(() => {
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {formData.expiryDate ? format(formData.expiryDate, "PPP") : "Pick a date"}
+                    {formData.expiryDate ? format(formData.expiryDate, "dd/MM/yy") : "Pick a date"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">

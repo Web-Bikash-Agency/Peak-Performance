@@ -14,6 +14,7 @@ import {
 import { Member } from "@/types/member";
 import { cn } from "@/lib/utils";
 import { MemberStatusSwitch } from "./MemberStatusSwitch";
+import { format } from "date-fns";
 
 interface MemberCardProps {
   member: Member;
@@ -124,7 +125,7 @@ export function MemberCard({
           </div>
           <div className="flex items-center text-sm text-muted-foreground">
             <Calendar className="w-4 h-4 mr-2" />
-            Expires: {expiryDate.toLocaleDateString()}
+            Expires: {format(expiryDate, "dd/MM/yy")}
             {daysUntilExpiry <= 2 && daysUntilExpiry > 0 && (
               <span className="ml-2 text-warning font-medium">
                 ({daysUntilExpiry} days left)
