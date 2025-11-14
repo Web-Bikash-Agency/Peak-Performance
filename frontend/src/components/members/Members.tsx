@@ -1,9 +1,10 @@
-import { Users, AlertTriangle, Plus } from "lucide-react";
+import { Users, AlertTriangle, Plus, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MemberFilters } from "./MemberFilters";
 import { MemberCard } from "./MemberCard";
 import { Member } from "@/types/member";
 import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
 
 interface MembersProps {
   members: Member[];
@@ -23,6 +24,9 @@ interface MembersProps {
   onAdd: () => void;
   onActivate: (id: string) => Promise<void>;
   onDeactivate: (id: string) => Promise<void>;
+  // Optional server-driven pagination
+  onLoadMore?: () => void;
+  hasMore?: boolean;
 }
 
 export const Members = ({
@@ -42,8 +46,33 @@ export const Members = ({
   onDelete,
   onAdd,
   onActivate, 
-  onDeactivate
+  onDeactivate,
+  onLoadMore,
+  hasMore
 }: MembersProps) => {
+  // If parent provides onLoadMore/hasMore we assume server-driven pagination
+  const serverDriven = typeof onLoadMore === 'function' && typeof hasMore === 'boolean';
+
+  // Client-side fallback: incremental reveal
+  const [itemsToShow, setItemsToShow] = useState(10);
+  const itemsPerPage = 10;
+
+  // Reset client-side pagination when filters change
+  useEffect(() => {
+    setItemsToShow(10);
+  }, [searchTerm, statusFilter, membershipFilter]);
+
+  const displayedMembers = serverDriven ? filteredMembers : filteredMembers.slice(0, itemsToShow);
+  const clientHasMore = itemsToShow < filteredMembers.length;
+
+  const handleShowMore = () => {
+    if (serverDriven) {
+      onLoadMore && onLoadMore();
+    } else {
+      setItemsToShow(prev => prev + itemsPerPage);
+    }
+  };
+
   return (
     <section>
       <Link to="/" className="text-2xl font-bold mb-6 flex items-center gap-2 cursor-pointer">
@@ -74,19 +103,35 @@ export const Members = ({
           <p className="text-muted-foreground">{membersError}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-          {filteredMembers.map((member) => (
-            <MemberCard
-              key={member.id}
-              member={member}
-              onEdit={onEdit}
-              onArchive={onArchive}
-              onDelete={onDelete}
-              onActivate={onActivate} 
-              onDeactivate={onDeactivate} 
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+            {displayedMembers.map((member) => (
+              <MemberCard
+                key={member.id}
+                member={member}
+                onEdit={onEdit}
+                onArchive={onArchive}
+                onDelete={onDelete}
+                onActivate={onActivate} 
+                onDeactivate={onDeactivate} 
+              />
+            ))}
+          </div>
+
+          {hasMore && (
+            <div className="flex justify-center mt-8">
+              <Button 
+                variant="outline" 
+                size="lg" 
+                onClick={handleShowMore}
+                className="w-full max-w-xs"
+              >
+                <ChevronDown className="w-4 h-4 mr-2" />
+                Show More Members
+              </Button>
+            </div>
+          )}
+        </>
       )}
 
       {!membersLoading && !membersError && filteredMembers.length === 0 && (

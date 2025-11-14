@@ -47,7 +47,7 @@ router.get('/', [
 
     const {
       page = 1,
-      limit = 1000,
+      limit = 10,
       search,
       status,
       membershipType,
