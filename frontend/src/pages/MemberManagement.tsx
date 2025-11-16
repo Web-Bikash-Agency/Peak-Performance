@@ -147,8 +147,8 @@ export default function MemberManagement() {
     const filtered = members.filter(member => {
       // Search term matching
       const matchesSearch = member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        member.phone.includes(searchTerm);
+        (member.email?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+        (member.phone?.includes(searchTerm) ?? false);
       
       // ✅ Status matching with correct uppercase database values
       let matchesStatus = true;
