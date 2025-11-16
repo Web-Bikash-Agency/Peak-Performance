@@ -55,9 +55,7 @@ router.get('/', [
       sortOrder = 'asc'
     } = req.query;
 
-    const skip = (Number(page) - 1) * Number(limit);
-
-    // Build where clause
+    // Build where clause (excluding status filter — will apply in-memory after computing)
     const where: any = {};
     
     if (search) {
@@ -68,22 +66,13 @@ router.get('/', [
       ];
     }
 
-    if (status) {
-      where.status = status;
-    }
-
     if (membershipType) {
       where.membershipType = membershipType;
     }
 
-    // Get total count
-    const total = await prisma.member.count({ where });
-
-    // Get members
-    const members = await prisma.member.findMany({
+    // Fetch all matching members (without pagination yet) to compute status and apply filters
+    const allMembers = await prisma.member.findMany({
       where,
-      skip,
-      take: Number(limit),
       orderBy: { [sortBy as string]: sortOrder },
       select: {
         id: true,
@@ -109,10 +98,47 @@ router.get('/', [
       }
     });
 
+    // Recompute member status based on expiryDate so frontend always sees current status
+    const now = new Date();
+    const fifteenDaysFromNow = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
+
+    const computedMembers = allMembers.map(m => {
+      // Preserve archived members
+      if (m.status === 'ARCHIVED') return m;
+
+      // Ensure expiryDate is a Date
+      const expiry = new Date(m.expiryDate);
+
+      let computedStatus: string = 'ACTIVE';
+      if (expiry <= now) {
+        computedStatus = 'INACTIVE';
+      } else if (expiry <= fifteenDaysFromNow) {
+        computedStatus = 'EXPIRING_SOON';
+      } else {
+        computedStatus = 'ACTIVE';
+      }
+
+      return {
+        ...m,
+        status: computedStatus
+      };
+    });
+
+    // Apply status filter to computed members (in-memory)
+    let filteredMembers = computedMembers;
+    if (status) {
+      filteredMembers = computedMembers.filter(m => m.status === status);
+    }
+
+    // Apply pagination to filtered results
+    const total = filteredMembers.length;
+    const skip = (Number(page) - 1) * Number(limit);
+    const paginatedMembers = filteredMembers.slice(skip, skip + Number(limit));
+
     res.json({
       success: true,
       data: {
-        members,
+        members: paginatedMembers,
         pagination: {
           page: Number(page),
           limit: Number(limit),
