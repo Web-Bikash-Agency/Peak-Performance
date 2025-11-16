@@ -6,7 +6,7 @@ import { prisma } from '../index';
 import { BadRequestError, UnauthorizedError, ConflictError } from '../middleware/errorHandler';
 import { Request, Response, NextFunction } from 'express';
 
-const router = Router();
+const router: Router = Router();
 
 // Validation middleware
 const validateRegistration = [
