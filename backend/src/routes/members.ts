@@ -3,14 +3,33 @@ import { body, query, validationResult } from 'express-validator';
 import { prisma } from '../index';
 import { BadRequestError, NotFoundError, ConflictError } from '../middleware/errorHandler';
 import { Request, Response, NextFunction } from 'express';
+import upload from '../middleware/upload';
+import cloudinary from '../config/cloudinary';
 
 const router: Router = Router();
+
+function uploadToCloudinary(fileBuffer: Buffer): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder: "gym-members" },
+      (error, result) => {
+        if (error || !result) {
+          console.error("Cloudinary error:", error);
+          return reject("Cloudinary upload failed");
+        }
+        resolve(result.secure_url);
+      }
+    );
+
+    stream.end(fileBuffer); // Send buffer to Cloudinary
+  });
+}
 
 // Validation middleware
 const validateMember = [
   body('name').trim().isLength({ min: 2 }).withMessage('Name must be at least 2 characters'),
-  body('age').isInt({ min: 16, max: 100 }).withMessage('Age must be between 16 and 100'),
-  body('gender').isIn(['MALE', 'FEMALE', 'OTHER']).withMessage('Invalid gender'),
+  body('age').toInt().isInt({ min: 16, max: 100 }).withMessage('Age must be between 16 and 100'),
+  body('gender').customSanitizer(val => val.toUpperCase()).isIn(['MALE', 'FEMALE', 'OTHER']).withMessage('Invalid gender'),
   body('email').optional().isEmail().normalizeEmail(),
   body('phone').trim().isLength({ min: 10 }).withMessage('Phone number must be at least 10 characters'),
   body('membershipType').isIn(['ONE_MONTH', 'THREE_MONTH', 'SIX_MONTH', 'ONE_YEAR']).withMessage('Invalid membership type'),
@@ -19,8 +38,8 @@ const validateMember = [
 
 const validateMemberUpdate = [
   body('name').optional().trim().isLength({ min: 2 }).withMessage('Name must be at least 2 characters'),
-  body('age').optional().isInt({ min: 16, max: 100 }).withMessage('Age must be between 16 and 100'),
-  body('gender').optional().isIn(['MALE', 'FEMALE', 'OTHER']).withMessage('Invalid gender'),
+  body('age').optional().toInt().isInt({ min: 16, max: 100 }).withMessage('Age must be between 16 and 100'),
+  body('gender').optional().customSanitizer(val => val.toUpperCase()).isIn(['MALE', 'FEMALE', 'OTHER']).withMessage('Invalid gender'),
   body('email').optional().isEmail().normalizeEmail(),
   body('phone').optional().trim().isLength({ min: 10 }).withMessage('Phone number must be at least 10 characters'),
   body('membershipType').optional().isIn(['ONE_MONTH', 'THREE_MONTH', 'SIX_MONTH', 'ONE_YEAR']).withMessage('Invalid membership type'),
@@ -193,7 +212,7 @@ router.get('/:id', async (req, res, next) => {
 });
 
 // Create new member
-router.post('/', validateMember, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', upload.single("profilePicture"), validateMember, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -202,6 +221,12 @@ router.post('/', validateMember, async (req: Request, res: Response, next: NextF
     }
 
     const memberData = req.body;
+
+    memberData.age = Number(memberData.age);
+    memberData.expiryDate = new Date(memberData.expiryDate);
+
+    console.log("Received body:", req.body);
+    console.log("Received file:", req.file);
 
     // Convert empty email to null
     if (memberData.email === "") {
@@ -219,6 +244,14 @@ router.post('/', validateMember, async (req: Request, res: Response, next: NextF
       }
     }
 
+    let imageUrl: string | null = null;
+
+    if (req.file) {
+      imageUrl = await uploadToCloudinary(req.file.buffer);
+      console.log("Uploaded to Cloudinary:", imageUrl);
+    }
+
+
     // Set status based on expiry date
     const expiryDate = new Date(memberData.expiryDate);
     const now = new Date();
@@ -234,6 +267,7 @@ router.post('/', validateMember, async (req: Request, res: Response, next: NextF
     const member = await prisma.member.create({
       data: {
         ...memberData,
+        profilePicture: imageUrl, 
         status,
         expiryDate: expiryDate
       }
@@ -250,7 +284,7 @@ router.post('/', validateMember, async (req: Request, res: Response, next: NextF
 });
 
 // Update member
-router.put('/:id', validateMemberUpdate, async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id', upload.single("profilePicture"), validateMemberUpdate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -260,6 +294,10 @@ router.put('/:id', validateMemberUpdate, async (req: Request, res: Response, nex
 
     const { id } = req.params;
     const updateData = req.body;
+
+    if (updateData.age) updateData.age = Number(updateData.age);
+    if (updateData.expiryDate) updateData.expiryDate = new Date(updateData.expiryDate);
+
 
     if (updateData.email === "") {
       updateData.email = null;
@@ -288,6 +326,13 @@ router.put('/:id', validateMemberUpdate, async (req: Request, res: Response, nex
         throw new ConflictError('Member with this email already exists');
       }
     }
+
+
+    if (req.file) {
+      updateData.profilePicture = await uploadToCloudinary(req.file.buffer);
+  }
+
+
 
     if (updateData.status === 'ACTIVE' && existingMember.status === 'ARCHIVED') {
   // When unarchiving, check if membership is still valid
