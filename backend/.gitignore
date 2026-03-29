@@ -1,3 +1,6 @@
+# Seed scripts
+src/script/seed.ts
+
 # Dependencies
 node_modules/
 npm-debug.log*

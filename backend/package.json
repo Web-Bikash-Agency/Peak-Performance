@@ -11,7 +11,7 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "db:seed": "tsx src/scripts/seed.ts"
+    "db:seed": "tsx src/script/seed.ts"
   },
   "keywords": [
     "fitness",
@@ -22,7 +22,7 @@
   "author": "Your Name",
   "license": "MIT",
   "dependencies": {
-    "@prisma/client": "^5.22.0",
+    "@prisma/client": "^6.19.2",
     "@supabase/supabase-js": "^2.55.0",
     "axios": "^1.11.0",
     "bcryptjs": "^2.4.3",
@@ -51,9 +51,9 @@
     "@types/node": "^20.10.0",
     "@types/nodemailer": "^6.4.14",
     "nodemon": "^3.0.2",
-    "prisma": "^5.7.0",
-    "ts-node": "^10.9.1",
+    "prisma": "^6.19.2",
+    "ts-node": "^10.9.2",
     "tsx": "^4.6.2",
-    "typescript": "^5.3.2"
+    "typescript": "^5.9.2"
   }
 }
