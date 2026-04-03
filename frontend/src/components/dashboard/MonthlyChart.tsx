@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { MonthlyStats } from '@/types/member';
+import { MonthlyStats } from '@/types/dashboard';
 import { useState, useEffect } from 'react';
 
 interface MonthlyChartProps {

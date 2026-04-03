@@ -22,6 +22,69 @@ const validatePaymentUpdate = [
   body('notes').optional().trim()
 ];
 
+// Get payment statistics (must be before /:id to avoid route conflict)
+router.get('/stats/overview', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Get total payments count
+    const totalPayments = await prisma.payment.count();
+
+    // Get pending payments count
+    const pendingPayments = await prisma.payment.count({
+      where: { status: 'PENDING' }
+    });
+
+    // Get overdue payments count
+    const overduePayments = await prisma.payment.count({
+      where: { status: 'OVERDUE' }
+    });
+
+    // Get total revenue (paid payments)
+    const totalRevenue = await prisma.payment.aggregate({
+      where: { status: 'PAID' },
+      _sum: { amount: true }
+    });
+
+    // Get this month's revenue
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const monthlyRevenue = await prisma.payment.aggregate({
+      where: {
+        status: 'PAID',
+        paidAt: {
+          gte: startOfMonth
+        }
+      },
+      _sum: { amount: true }
+    });
+
+    // Get payment type distribution
+    const paymentTypeDistribution = await prisma.payment.groupBy({
+      by: ['paymentType'],
+      _count: { id: true },
+      where: { status: { not: 'CANCELLED' } }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        totalPayments,
+        pendingPayments,
+        overduePayments,
+        totalRevenue: totalRevenue._sum.amount || 0,
+        monthlyRevenue: monthlyRevenue._sum.amount || 0,
+        paymentTypeDistribution: paymentTypeDistribution.map(item => ({
+          type: item.paymentType,
+          count: item._count.id
+        }))
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Get all payments with pagination and filtering
 router.get('/', [
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
@@ -80,7 +143,6 @@ router.get('/', [
           select: {
             id: true,
             name: true,
-            email: true,
             profilePicture: true
           }
         }
@@ -120,7 +182,6 @@ router.get('/:id', async (req, res, next) => {
           select: {
             id: true,
             name: true,
-            email: true,
             phone: true,
             profilePicture: true
           }
@@ -181,7 +242,6 @@ router.post('/', validatePayment, async (req: Request, res: Response, next: Next
           select: {
             id: true,
             name: true,
-            email: true
           }
         }
       }
@@ -245,7 +305,6 @@ router.put('/:id', validatePaymentUpdate, async (req: Request, res: Response, ne
           select: {
             id: true,
             name: true,
-            email: true
           }
         }
       }
@@ -332,7 +391,6 @@ router.patch('/:id/mark-paid', async (req, res, next) => {
           select: {
             id: true,
             name: true,
-            email: true
           }
         }
       }
@@ -342,69 +400,6 @@ router.patch('/:id/mark-paid', async (req, res, next) => {
       success: true,
       message: 'Payment marked as paid successfully',
       data: { payment: updatedPayment }
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// Get payment statistics
-router.get('/stats/overview', async (req, res, next) => {
-  try {
-    // Get total payments count
-    const totalPayments = await prisma.payment.count();
-
-    // Get pending payments count
-    const pendingPayments = await prisma.payment.count({
-      where: { status: 'PENDING' }
-    });
-
-    // Get overdue payments count
-    const overduePayments = await prisma.payment.count({
-      where: { status: 'OVERDUE' }
-    });
-
-    // Get total revenue (paid payments)
-    const totalRevenue = await prisma.payment.aggregate({
-      where: { status: 'PAID' },
-      _sum: { amount: true }
-    });
-
-    // Get this month's revenue
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
-
-    const monthlyRevenue = await prisma.payment.aggregate({
-      where: {
-        status: 'PAID',
-        paidAt: {
-          gte: startOfMonth
-        }
-      },
-      _sum: { amount: true }
-    });
-
-    // Get payment type distribution
-    const paymentTypeDistribution = await prisma.payment.groupBy({
-      by: ['paymentType'],
-      _count: { id: true },
-      where: { status: { not: 'CANCELLED' } }
-    });
-
-    res.json({
-      success: true,
-      data: {
-        totalPayments,
-        pendingPayments,
-        overduePayments,
-        totalRevenue: totalRevenue._sum.amount || 0,
-        monthlyRevenue: monthlyRevenue._sum.amount || 0,
-        paymentTypeDistribution: paymentTypeDistribution.map(item => ({
-          type: item.paymentType,
-          count: item._count.id
-        }))
-      }
     });
   } catch (error) {
     next(error);

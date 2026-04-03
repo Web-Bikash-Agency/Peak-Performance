@@ -69,7 +69,7 @@ router.post('/register', validateRegistration, async (req: Request, res: Respons
     }
 
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
+      { id: user.id, email: user.email, role: user.role, isActive: true },
       process.env.JWT_SECRET as string,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
@@ -119,7 +119,7 @@ router.post('/login', validateLogin, async (req: Request, res: Response, next: N
     }
 
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
+      { id: user.id, email: user.email, role: user.role, isActive: user.isActive },
       process.env.JWT_SECRET as string,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
@@ -214,7 +214,7 @@ router.post('/refresh', async (req, res, next) => {
 
     // Generate new token
     const newToken = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
+      { id: user.id, email: user.email, role: user.role, isActive: user.isActive },
       process.env.JWT_SECRET as string,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
