@@ -1,4 +1,6 @@
-import { Users, AlertTriangle, Plus } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { Users, AlertTriangle, Plus, Loader2 } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { MemberFilters } from "./MemberFilters";
 import { MemberCard } from "./MemberCard";
@@ -7,7 +9,11 @@ import { Member } from "@/types/member";
 interface MembersProps {
   members: Member[];
   filteredMembers: Member[];
+  total: number;
   membersLoading: boolean;
+  isFetchingNextPage: boolean;
+  hasNextPage: boolean;
+  onLoadMore: () => void;
   membersError: string | null;
   searchTerm: string;
   setSearchTerm: (value: string) => void;
@@ -27,7 +33,11 @@ interface MembersProps {
 export const Members = ({
   members,
   filteredMembers,
+  total,
   membersLoading,
+  isFetchingNextPage,
+  hasNextPage,
+  onLoadMore,
   membersError,
   searchTerm,
   setSearchTerm,
@@ -40,9 +50,21 @@ export const Members = ({
   onArchive,
   onDelete,
   onAdd,
-  onActivate, 
-  onDeactivate
+  onActivate,
+  onDeactivate,
 }: MembersProps) => {
+  // Sentinel element — triggers next page load when it scrolls into view
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!sentinelRef.current) return;
+    const observer = new IntersectionObserver(
+      entries => { if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) onLoadMore(); },
+      { threshold: 0.1 }
+    );
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, onLoadMore]);
   return (
     <section>
       <h2 className="text-2xl font-bold mb-6 flex items-center gap-2 cursor-default">
@@ -86,6 +108,23 @@ export const Members = ({
             />
           ))}
         </div>
+      )}
+
+      {/* Scroll sentinel — IntersectionObserver watches this to load next page */}
+      {!membersLoading && !membersError && <div ref={sentinelRef} className="h-4" />}
+
+      {/* Loading spinner while fetching next page */}
+      {isFetchingNextPage && (
+        <div className="flex justify-center py-6">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        </div>
+      )}
+
+      {/* Loaded-all indicator */}
+      {!membersLoading && !membersError && !hasNextPage && filteredMembers.length > 0 && (
+        <p className="text-center text-sm text-muted-foreground py-6">
+          All {filteredMembers.length} members loaded
+        </p>
       )}
 
       {!membersLoading && !membersError && filteredMembers.length === 0 && (

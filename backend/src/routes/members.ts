@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { body, query, validationResult } from 'express-validator';
 import { prisma } from '../index';
-import { BadRequestError, NotFoundError, ConflictError } from '../middleware/errorHandler';
+import { BadRequestError, NotFoundError } from '../middleware/errorHandler';
 import { Request, Response, NextFunction } from 'express';
 
 const router = Router();
@@ -11,7 +11,6 @@ const validateMember = [
   body('name').trim().isLength({ min: 2 }).withMessage('Name must be at least 2 characters'),
   body('age').isInt({ min: 16, max: 100 }).withMessage('Age must be between 16 and 100'),
   body('gender').isIn(['MALE', 'FEMALE', 'OTHER']).withMessage('Invalid gender'),
-  body('email').isEmail().normalizeEmail(),
   body('phone').trim().isLength({ min: 10 }).withMessage('Phone number must be at least 10 characters'),
   body('membershipType').isIn(['ONE_MONTH', 'THREE_MONTH', 'SIX_MONTH', 'ONE_YEAR']).withMessage('Invalid membership type'),
   body('expiryDate').isISO8601().withMessage('Invalid expiry date')
@@ -21,7 +20,6 @@ const validateMemberUpdate = [
   body('name').optional().trim().isLength({ min: 2 }).withMessage('Name must be at least 2 characters'),
   body('age').optional().isInt({ min: 16, max: 100 }).withMessage('Age must be between 16 and 100'),
   body('gender').optional().isIn(['MALE', 'FEMALE', 'OTHER']).withMessage('Invalid gender'),
-  body('email').optional().isEmail().normalizeEmail(),
   body('phone').optional().trim().isLength({ min: 10 }).withMessage('Phone number must be at least 10 characters'),
   body('membershipType').optional().isIn(['ONE_MONTH', 'THREE_MONTH', 'SIX_MONTH', 'ONE_YEAR']).withMessage('Invalid membership type'),
   body('expiryDate').optional().isISO8601().withMessage('Invalid expiry date'),
@@ -34,7 +32,7 @@ router.get('/', [
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
   query('search').optional().trim(),
   query('status').optional().isIn(['ACTIVE', 'INACTIVE', 'EXPIRING_SOON', 'ARCHIVED']),
-  query('membershipType').optional().isIn(['ONE_MONTH', 'THREE_MONTH', ' SIX_MONTH', 'ONE_YEAR']),
+  query('membershipType').optional().isIn(['ONE_MONTH', 'THREE_MONTH', 'SIX_MONTH', 'ONE_YEAR']),
   query('sortBy').optional().isIn(['name', 'joinDate', 'expiryDate', 'status']),
   query('sortOrder').optional().isIn(['asc', 'desc'])
 ], async (req: Request, res: Response, next: NextFunction) => {
@@ -63,13 +61,20 @@ router.get('/', [
     if (search) {
       where.OR = [
         { name: { contains: search as string, mode: 'insensitive' } },
-        { email: { contains: search as string, mode: 'insensitive' } },
         { phone: { contains: search as string, mode: 'insensitive' } }
       ];
     }
 
     if (status) {
-      where.status = status;
+      if (status === 'EXPIRING_SOON') {
+        // date-based: expires within the next 3 days, not archived
+        const now = new Date();
+        const threeDays = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+        where.expiryDate = { gte: now, lte: threeDays };
+        where.status = { not: 'ARCHIVED' };
+      } else {
+        where.status = status;
+      }
     }
 
     if (membershipType) {
@@ -90,7 +95,6 @@ router.get('/', [
         name: true,
         age: true,
         gender: true,
-        email: true,
         phone: true,
         membershipType: true,
         expiryDate: true,
@@ -177,24 +181,15 @@ router.post('/', validateMember, async (req: Request, res: Response, next: NextF
 
     const memberData = req.body;
 
-    // Check if email already exists
-    const existingMember = await prisma.member.findUnique({
-      where: { email: memberData.email }
-    });
-
-    if (existingMember) {
-      throw new ConflictError('Member with this email already exists');
-    }
-
     // Set status based on expiry date
     const expiryDate = new Date(memberData.expiryDate);
     const now = new Date();
-    const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
 
     let status = 'ACTIVE';
-    if (expiryDate <= now) {
+    if (expiryDate < now) {
       status = 'INACTIVE';
-    } else if (expiryDate <= thirtyDaysFromNow) {
+    } else if (expiryDate <= threeDaysFromNow) {
       status = 'EXPIRING_SOON';
     }
 
@@ -241,26 +236,15 @@ router.put('/:id', validateMemberUpdate, async (req: Request, res: Response, nex
       throw new NotFoundError('Member not found');
     }
 
-    // Check email uniqueness if updating email
-    if (updateData.email && updateData.email !== existingMember.email) {
-      const emailExists = await prisma.member.findUnique({
-        where: { email: updateData.email }
-      });
-
-      if (emailExists) {
-        throw new ConflictError('Member with this email already exists');
-      }
-    }
-
     // Update status based on expiry date if it's being updated
     if (updateData.expiryDate) {
       const expiryDate = new Date(updateData.expiryDate);
       const now = new Date();
-      const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
 
-      if (expiryDate <= now) {
+      if (expiryDate < now) {
         updateData.status = 'INACTIVE';
-      } else if (expiryDate <= thirtyDaysFromNow) {
+      } else if (expiryDate <= threeDaysFromNow) {
         updateData.status = 'EXPIRING_SOON';
       } else {
         updateData.status = 'ACTIVE';
@@ -291,20 +275,16 @@ router.delete('/:id', async (req, res, next) => {
       throw new BadRequestError('Member ID is required');
     }
 
-    // Check if member exists
-    const member = await prisma.member.findUnique({
-      where: { id }
-    });
-
-    if (!member) {
-      throw new NotFoundError('Member not found');
+    // Soft delete — update throws P2025 if record not found
+    try {
+      await prisma.member.update({
+        where: { id },
+        data: { status: 'ARCHIVED' }
+      });
+    } catch (e: any) {
+      if (e?.code === 'P2025') throw new NotFoundError('Member not found');
+      throw e;
     }
-
-    // Soft delete by setting status to archived
-    await prisma.member.update({
-      where: { id },
-      data: { status: 'ARCHIVED' }
-    });
 
     res.json({
       success: true,
@@ -324,45 +304,36 @@ router.get('/:id/stats', async (req, res, next) => {
       throw new BadRequestError('Member ID is required');
     }
 
-    const member = await prisma.member.findUnique({
-      where: { id }
-    });
+    const member = await prisma.member.findUnique({ where: { id } });
 
     if (!member) {
       throw new NotFoundError('Member not found');
     }
 
-    // Get check-in count
-    const checkInCount = await prisma.checkIn.count({
-      where: { memberId: id }
-    });
-
-    // Get payment count and total
-    const payments = await prisma.payment.findMany({
-      where: { memberId: id }
-    });
-
-    const totalPaid = payments
-      .filter(p => p.status === 'PAID')
-      .reduce((sum, p) => sum + p.amount, 0);
-
-    // Get workout count and total duration
-    const workouts = await prisma.workout.findMany({
-      where: { memberId: id }
-    });
-
-    const totalWorkoutDuration = workouts.reduce((sum, w) => sum + w.duration, 0);
-    const totalCalories = workouts.reduce((sum, w) => sum + (w.calories || 0), 0);
+    const [checkInCount, paymentStats, paymentCount, workoutStats, workoutCount] = await Promise.all([
+      prisma.checkIn.count({ where: { memberId: id } }),
+      prisma.payment.aggregate({
+        where: { memberId: id, status: 'PAID' },
+        _sum: { amount: true }
+      }),
+      prisma.payment.count({ where: { memberId: id } }),
+      prisma.workout.aggregate({
+        where: { memberId: id },
+        _sum: { duration: true, calories: true },
+        _count: { id: true }
+      }),
+      prisma.workout.count({ where: { memberId: id } })
+    ]);
 
     res.json({
       success: true,
       data: {
         checkInCount,
-        paymentCount: payments.length,
-        totalPaid,
-        workoutCount: workouts.length,
-        totalWorkoutDuration,
-        totalCalories
+        paymentCount,
+        totalPaid: paymentStats._sum.amount || 0,
+        workoutCount,
+        totalWorkoutDuration: workoutStats._sum.duration || 0,
+        totalCalories: workoutStats._sum.calories || 0
       }
     });
   } catch (error) {

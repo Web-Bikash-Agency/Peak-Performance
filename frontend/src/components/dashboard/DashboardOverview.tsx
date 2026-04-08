@@ -2,16 +2,12 @@ import { Activity, AlertTriangle, TrendingUp, Users, Loader2 } from "lucide-reac
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { MonthlyChart } from "@/components/dashboard/MonthlyChart";
 import { useNavigate } from "react-router-dom";
-import { useEffect } from "react";
+import { MonthlyStats } from "@/types/dashboard";
+import { MemberCounts } from "@/types/member";
 
 interface DashboardOverviewProps {
-  memberCounts: {
-    total: number;
-    active: number;
-    inactive: number;
-    expiringSoon: number;
-  };
-  monthlyStats: any[];
+  memberCounts: MemberCounts;
+  monthlyStats: MonthlyStats[];
   loading: boolean;
   error: string | null;
 }
@@ -25,11 +21,6 @@ export const DashboardOverview = ({ memberCounts, monthlyStats, loading, error }
   };
 
 
-  useEffect(() => {
-  console.log('Monthly stats received:', monthlyStats);
-  console.log('Data length:', monthlyStats?.length);
-  console.log('First item:', monthlyStats?.[0]);
-}, [monthlyStats]);
 
 
   return (

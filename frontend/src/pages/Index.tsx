@@ -1,21 +1,23 @@
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus, Dumbbell, LogOut } from "lucide-react";
+import { UserPlus, Dumbbell, LogOut } from "lucide-react";
 import { AddMemberForm } from "@/components/members/AddMemberForm";
 import { useToast } from "@/hooks/use-toast";
-import { useDashboardData, useMembers } from "@/hooks/use-api";
+import { useDashboardData, useMembers, usePaymentStats } from "@/hooks/use-api";
 import { useAuth } from "@/contexts/AuthContext";
 import { Member } from "@/types/member";
 import { DashboardOverview } from "@/components/dashboard/DashboardOverview";
+import { FinancialOverview } from "@/components/dashboard/FinancialOverview";
 
 const Index = () => {
   const { toast } = useToast();
   const { logout } = useAuth();
   const { stats, monthlyStats, loading: dashboardLoading, error: dashboardError } = useDashboardData();
-  const { 
-    members, 
-    loading: membersLoading, 
-    error: membersError, 
+  const { paymentStats, loading: paymentStatsLoading } = usePaymentStats();
+  const {
+    members,
+    loading: membersLoading,
+    error: membersError,
     addMember: apiAddMember,
     updateMember: apiUpdateMember,
     deleteMember: apiDeleteMember
@@ -40,7 +42,6 @@ const Index = () => {
   const filteredMembers = useMemo(() => {
     return members.filter(member => {
       const matchesSearch = member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
         member.phone.includes(searchTerm);
       const matchesStatus = statusFilter === "all" || member.status === statusFilter;
       const matchesMembership = membershipFilter === "all" || member.membershipType === membershipFilter;
@@ -90,53 +91,53 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background px-3">
       {/* Header */}
-<header className="border-b bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50">
-  <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6">
-    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
-      
-      {/* Logo and Title Section */}
-      <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
-        <div className="bg-gradient-primary p-1.5 sm:p-2 rounded-lg shadow-glow flex-shrink-0">
-          <Dumbbell className="w-6 h-6 sm:w-8 sm:h-8 text-primary-foreground" />
+      <header className="border-b bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50">
+        <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
+
+            {/* Logo and Title Section */}
+            <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+              <div className="bg-gradient-primary p-1.5 sm:p-2 rounded-lg shadow-glow flex-shrink-0">
+                <Dumbbell className="w-6 h-6 sm:w-8 sm:h-8 text-primary-foreground" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent truncate cursor-default">
+                  FitCulture Admin
+                </h1>
+                <p className="text-sm sm:text-base text-muted-foreground hidden sm:block cursor-default">
+                  Gym Management System
+                </p>
+                <p className="text-xs text-muted-foreground sm:hidden cursor-default">
+                  Gym Management
+                </p>
+              </div>
+            </div>
+
+            {/* Action Buttons Section */}
+            <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end">
+              <Button
+                onClick={() => setIsAddMemberOpen(true)}
+                variant="premium"
+                className="shadow-primary flex-1 sm:flex-none"
+                size="sm"
+              >
+                <UserPlus className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                <span className="hidden xs:inline">Add Member</span>
+                <span className="xs:hidden">Add</span>
+              </Button>
+              <Button
+                onClick={logout}
+                variant="outline"
+                size="sm"
+                className="flex-shrink-0"
+              >
+                <LogOut className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Logout</span>
+              </Button>
+            </div>
+          </div>
         </div>
-        <div className="min-w-0 flex-1">
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent truncate cursor-default">
-            FitCulture Admin
-          </h1>
-          <p className="text-sm sm:text-base text-muted-foreground hidden sm:block cursor-default">
-            Gym Management System
-          </p>
-          <p className="text-xs text-muted-foreground sm:hidden cursor-default">
-            Gym Management
-          </p>
-        </div>
-      </div>
-      
-      {/* Action Buttons Section */}
-      <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end">
-        <Button 
-          onClick={() => setIsAddMemberOpen(true)} 
-          variant="premium" 
-          className="shadow-primary flex-1 sm:flex-none"
-          size="sm"
-        >
-          <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-          <span className="hidden xs:inline">Add Member</span>
-          <span className="xs:hidden">Add</span>
-        </Button>
-        <Button 
-          onClick={logout} 
-          variant="outline" 
-          size="sm"
-          className="flex-shrink-0"
-        >
-          <LogOut className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-          <span className="hidden sm:inline">Logout</span>
-        </Button>
-      </div>
-    </div>
-  </div>
-</header>
+      </header>
 
       <main className="container mx-auto px-4 py-8 space-y-8">
         <DashboardOverview
@@ -144,6 +145,11 @@ const Index = () => {
           monthlyStats={monthlyStats}
           loading={dashboardLoading}
           error={dashboardError}
+        />
+        <FinancialOverview
+          monthlyStats={monthlyStats}
+          paymentStats={paymentStats}
+          loading={dashboardLoading || paymentStatsLoading}
         />
       </main>
 

@@ -1,53 +1,18 @@
-import { Member, MonthlyStats, DashboardStats } from '@/types/member';
+import { ApiResponse, PaginatedResponse, Pagination } from '@/types/api';
+import { LoginRequest, LoginResponse, RegisterRequest } from '@/types/auth';
+import { Member, MemberStats, GetMembersParams } from '@/types/member';
+import { DashboardStats, DashboardOverviewStats, MonthlyStats, MembershipDistribution, GenderDistribution, AgeDistribution, RecentActivity } from '@/types/dashboard';
+import { Payment, PaymentStats, GetPaymentsParams } from '@/types/payment';
+import { Workout, WorkoutStats, MemberWorkoutHistory, GetWorkoutsParams } from '@/types/workout';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-// API Response types
-interface ApiResponse<T> {
-  success: boolean;
-  message?: string;
-  data: T;
-}
-
-interface PaginatedResponse<T> {
-  data: T[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    pages: number;
-  };
-}
-
-// Auth types
-interface LoginRequest {
-  email: string;
-  password: string;
-}
-
-interface LoginResponse {
-  user: {
-    id: string;
-    email: string;
-    name: string;
-    role: string;
-  };
-  token: string;
-}
-
-interface RegisterRequest {
-  email: string;
-  password: string;
-  name: string;
-}
-
-// Utility function for API calls
 async function apiCall<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> {
   const token = localStorage.getItem('authToken');
-  
+
   const config: RequestInit = {
     headers: {
       'Content-Type': 'application/json',
@@ -59,7 +24,7 @@ async function apiCall<T>(
 
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
-    
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
@@ -74,365 +39,155 @@ async function apiCall<T>(
 
 // Auth API
 export const authAPI = {
-  login: async (credentials: LoginRequest): Promise<ApiResponse<LoginResponse>> => {
-    return apiCall<LoginResponse>('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify(credentials),
-    });
-  },
+  login: (credentials: LoginRequest): Promise<ApiResponse<LoginResponse>> =>
+    apiCall<LoginResponse>('/auth/login', { method: 'POST', body: JSON.stringify(credentials) }),
 
-  register: async (userData: RegisterRequest): Promise<ApiResponse<LoginResponse>> => {
-    return apiCall<LoginResponse>('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify(userData),
-    });
-  },
+  register: (userData: RegisterRequest): Promise<ApiResponse<LoginResponse>> =>
+    apiCall<LoginResponse>('/auth/register', { method: 'POST', body: JSON.stringify(userData) }),
 
-  getProfile: async (): Promise<ApiResponse<{ user: any }>> => {
-    return apiCall<{ user: any }>('/auth/me');
-  },
+  getProfile: (): Promise<ApiResponse<{ user: LoginResponse['user'] }>> =>
+    apiCall<{ user: LoginResponse['user'] }>('/auth/me'),
 
-  logout: async (): Promise<ApiResponse<{ message: string }>> => {
-    return apiCall<{ message: string }>('/auth/logout', {
-      method: 'POST',
-    });
-  },
+  logout: (): Promise<ApiResponse<{ message: string }>> =>
+    apiCall<{ message: string }>('/auth/logout', { method: 'POST' }),
 
-  refreshToken: async (): Promise<ApiResponse<{ token: string }>> => {
-    return apiCall<{ token: string }>('/auth/refresh', {
-      method: 'POST',
-    });
-  },
+  refreshToken: (): Promise<ApiResponse<{ token: string }>> =>
+    apiCall<{ token: string }>('/auth/refresh', { method: 'POST' }),
 };
 
 // Members API
 export const membersAPI = {
-  getAll: async (params?: {
-    page?: number;
-    limit?: number;
-    search?: string;
-    status?: string;
-    membershipType?: string;
-    sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
-  }): Promise<ApiResponse<PaginatedResponse<Member>>> => {
+  getAll: (params?: GetMembersParams): Promise<ApiResponse<{ members: Member[]; pagination: Pagination }>> => {
     const searchParams = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined) {
-          searchParams.append(key, value.toString());
-        }
+        if (value !== undefined) searchParams.append(key, value.toString());
       });
     }
-    
-    const queryString = searchParams.toString();
-    const endpoint = queryString ? `/members?${queryString}` : '/members';
-    
-    return apiCall<PaginatedResponse<Member>>(endpoint);
+    const qs = searchParams.toString();
+    return apiCall<{ members: Member[]; pagination: Pagination }>(qs ? `/members?${qs}` : '/members');
   },
 
-  getById: async (id: string): Promise<ApiResponse<{ member: Member & { 
-    checkIns: any[];
-    payments: any[];
-    workouts: any[];
-  } }>> => {
-    return apiCall<{ member: Member & { 
-      checkIns: any[];
-      payments: any[];
-      workouts: any[];
-    } }>(`/members/${id}`);
-  },
+  getById: (id: string): Promise<ApiResponse<{ member: Member & { checkIns: unknown[]; payments: Payment[]; workouts: Workout[] } }>> =>
+    apiCall<{ member: Member & { checkIns: unknown[]; payments: Payment[]; workouts: Workout[] } }>(`/members/${id}`),
 
-  create: async (memberData: Omit<Member, 'id' | 'createdAt' | 'updatedAt'>): Promise<ApiResponse<{ member: Member }>> => {
-    return apiCall<{ member: Member }>('/members', {
-      method: 'POST',
-      body: JSON.stringify(memberData),
-    });
-  },
+  create: (memberData: Omit<Member, 'id'>): Promise<ApiResponse<{ member: Member }>> =>
+    apiCall<{ member: Member }>('/members', { method: 'POST', body: JSON.stringify(memberData) }),
 
-  update: async (id: string, memberData: Partial<Member>): Promise<ApiResponse<{ member: Member }>> => {
-    return apiCall<{ member: Member }>(`/members/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(memberData),
-    });
-  },
+  update: (id: string, memberData: Partial<Member>): Promise<ApiResponse<{ member: Member }>> =>
+    apiCall<{ member: Member }>(`/members/${id}`, { method: 'PUT', body: JSON.stringify(memberData) }),
 
-  delete: async (id: string): Promise<ApiResponse<{ message: string }>> => {
-    return apiCall<{ message: string }>(`/members/${id}`, {
-      method: 'DELETE',
-    });
-  },
+  delete: (id: string): Promise<ApiResponse<{ message: string }>> =>
+    apiCall<{ message: string }>(`/members/${id}`, { method: 'DELETE' }),
 
-  getStats: async (id: string): Promise<ApiResponse<{
-    checkInCount: number;
-    paymentCount: number;
-    totalPaid: number;
-    workoutCount: number;
-    totalWorkoutDuration: number;
-    totalCalories: number;
-  }>> => {
-    return apiCall<{
-      checkInCount: number;
-      paymentCount: number;
-      totalPaid: number;
-      workoutCount: number;
-      totalWorkoutDuration: number;
-      totalCalories: number;
-    }>(`/members/${id}/stats`);
-  },
+  getStats: (id: string): Promise<ApiResponse<MemberStats>> =>
+    apiCall<MemberStats>(`/members/${id}/stats`),
 };
 
 // Dashboard API
 export const dashboardAPI = {
-  getOverview: async (): Promise<ApiResponse<DashboardStats & {
-    todayCheckIns: number;
-    monthlyRevenue: number;
-    newMembersThisMonth: number;
-  }>> => {
-    return apiCall<DashboardStats & {
-      todayCheckIns: number;
-      monthlyRevenue: number;
-      newMembersThisMonth: number;
-    }>('/dashboard/overview');
-  },
+  getOverview: (): Promise<ApiResponse<DashboardOverviewStats>> =>
+    apiCall<DashboardOverviewStats>('/dashboard/overview'),
 
-  getMonthlyStats: async (year?: number): Promise<ApiResponse<MonthlyStats[]>> => {
+  getMonthlyStats: (year?: number): Promise<ApiResponse<MonthlyStats[]>> => {
     const endpoint = year ? `/dashboard/monthly-stats?year=${year}` : '/dashboard/monthly-stats';
     return apiCall<MonthlyStats[]>(endpoint);
   },
 
-  getMembershipDistribution: async (): Promise<ApiResponse<{ type: string; count: number }[]>> => {
-    return apiCall<{ type: string; count: number }[]>('/dashboard/membership-distribution');
-  },
+  getMembershipDistribution: (): Promise<ApiResponse<MembershipDistribution[]>> =>
+    apiCall<MembershipDistribution[]>('/dashboard/membership-distribution'),
 
-  getGenderDistribution: async (): Promise<ApiResponse<{ gender: string; count: number }[]>> => {
-    return apiCall<{ gender: string; count: number }[]>('/dashboard/gender-distribution');
-  },
+  getGenderDistribution: (): Promise<ApiResponse<GenderDistribution[]>> =>
+    apiCall<GenderDistribution[]>('/dashboard/gender-distribution'),
 
-  getAgeDistribution: async (): Promise<ApiResponse<{ range: string; count: number }[]>> => {
-    return apiCall<{ range: string; count: number }[]>('/dashboard/age-distribution');
-  },
+  getAgeDistribution: (): Promise<ApiResponse<AgeDistribution[]>> =>
+    apiCall<AgeDistribution[]>('/dashboard/age-distribution'),
 
-  getRecentActivities: async (limit?: number): Promise<ApiResponse<any[]>> => {
+  getRecentActivities: (limit?: number): Promise<ApiResponse<RecentActivity[]>> => {
     const endpoint = limit ? `/dashboard/recent-activities?limit=${limit}` : '/dashboard/recent-activities';
-    return apiCall<any[]>(endpoint);
+    return apiCall<RecentActivity[]>(endpoint);
   },
 };
 
 // Payments API
 export const paymentsAPI = {
-  getAll: async (params?: {
-    page?: number;
-    limit?: number;
-    memberId?: string;
-    status?: string;
-    paymentType?: string;
-    sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
-  }): Promise<ApiResponse<PaginatedResponse<any>>> => {
+  getAll: (params?: GetPaymentsParams): Promise<ApiResponse<PaginatedResponse<Payment>>> => {
     const searchParams = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined) {
-          searchParams.append(key, value.toString());
-        }
+        if (value !== undefined) searchParams.append(key, value.toString());
       });
     }
-    
-    const queryString = searchParams.toString();
-    const endpoint = queryString ? `/payments?${queryString}` : '/payments';
-    
-    return apiCall<PaginatedResponse<any>>(endpoint);
+    const qs = searchParams.toString();
+    return apiCall<PaginatedResponse<Payment>>(qs ? `/payments?${qs}` : '/payments');
   },
 
-  getById: async (id: string): Promise<ApiResponse<{ payment: any }>> => {
-    return apiCall<{ payment: any }>(`/payments/${id}`);
-  },
+  getById: (id: string): Promise<ApiResponse<{ payment: Payment }>> =>
+    apiCall<{ payment: Payment }>(`/payments/${id}`),
 
-  create: async (paymentData: any): Promise<ApiResponse<{ payment: any }>> => {
-    return apiCall<{ payment: any }>('/payments', {
-      method: 'POST',
-      body: JSON.stringify(paymentData),
-    });
-  },
+  create: (paymentData: Omit<Payment, 'id' | 'createdAt' | 'updatedAt' | 'member'>): Promise<ApiResponse<{ payment: Payment }>> =>
+    apiCall<{ payment: Payment }>('/payments', { method: 'POST', body: JSON.stringify(paymentData) }),
 
-  update: async (id: string, paymentData: any): Promise<ApiResponse<{ payment: any }>> => {
-    return apiCall<{ payment: any }>(`/payments/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(paymentData),
-    });
-  },
+  update: (id: string, paymentData: Partial<Payment>): Promise<ApiResponse<{ payment: Payment }>> =>
+    apiCall<{ payment: Payment }>(`/payments/${id}`, { method: 'PUT', body: JSON.stringify(paymentData) }),
 
-  delete: async (id: string): Promise<ApiResponse<{ message: string }>> => {
-    return apiCall<{ message: string }>(`/payments/${id}`, {
-      method: 'DELETE',
-    });
-  },
+  delete: (id: string): Promise<ApiResponse<{ message: string }>> =>
+    apiCall<{ message: string }>(`/payments/${id}`, { method: 'DELETE' }),
 
-  markAsPaid: async (id: string, data?: { amount?: number; notes?: string }): Promise<ApiResponse<{ payment: any }>> => {
-    return apiCall<{ payment: any }>(`/payments/${id}/mark-paid`, {
-      method: 'PATCH',
-      body: JSON.stringify(data || {}),
-    });
-  },
+  markAsPaid: (id: string, data?: { amount?: number; notes?: string }): Promise<ApiResponse<{ payment: Payment }>> =>
+    apiCall<{ payment: Payment }>(`/payments/${id}/mark-paid`, { method: 'PATCH', body: JSON.stringify(data || {}) }),
 
-  getStats: async (): Promise<ApiResponse<{
-    totalPayments: number;
-    pendingPayments: number;
-    overduePayments: number;
-    totalRevenue: number;
-    monthlyRevenue: number;
-    paymentTypeDistribution: { type: string; count: number }[];
-  }>> => {
-    return apiCall<{
-      totalPayments: number;
-      pendingPayments: number;
-      overduePayments: number;
-      totalRevenue: number;
-      monthlyRevenue: number;
-      paymentTypeDistribution: { type: string; count: number }[];
-    }>('/payments/stats/overview');
-  },
+  getStats: (): Promise<ApiResponse<PaymentStats>> =>
+    apiCall<PaymentStats>('/payments/stats/overview'),
 };
 
 // Workouts API
 export const workoutsAPI = {
-  getAll: async (params?: {
-    page?: number;
-    limit?: number;
-    memberId?: string;
-    workoutType?: string;
-    startDate?: string;
-    endDate?: string;
-    sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
-  }): Promise<ApiResponse<PaginatedResponse<any>>> => {
+  getAll: (params?: GetWorkoutsParams): Promise<ApiResponse<PaginatedResponse<Workout>>> => {
     const searchParams = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined) {
-          searchParams.append(key, value.toString());
-        }
+        if (value !== undefined) searchParams.append(key, value.toString());
       });
     }
-    
-    const queryString = searchParams.toString();
-    const endpoint = queryString ? `/workouts?${queryString}` : '/workouts';
-    
-    return apiCall<PaginatedResponse<any>>(endpoint);
+    const qs = searchParams.toString();
+    return apiCall<PaginatedResponse<Workout>>(qs ? `/workouts?${qs}` : '/workouts');
   },
 
-  getById: async (id: string): Promise<ApiResponse<{ workout: any }>> => {
-    return apiCall<{ workout: any }>(`/workouts/${id}`);
-  },
+  getById: (id: string): Promise<ApiResponse<{ workout: Workout }>> =>
+    apiCall<{ workout: Workout }>(`/workouts/${id}`),
 
-  create: async (workoutData: any): Promise<ApiResponse<{ workout: any }>> => {
-    return apiCall<{ workout: any }>('/workouts', {
-      method: 'POST',
-      body: JSON.stringify(workoutData),
-    });
-  },
+  create: (workoutData: Omit<Workout, 'id' | 'createdAt' | 'updatedAt' | 'member'>): Promise<ApiResponse<{ workout: Workout }>> =>
+    apiCall<{ workout: Workout }>('/workouts', { method: 'POST', body: JSON.stringify(workoutData) }),
 
-  update: async (id: string, workoutData: any): Promise<ApiResponse<{ workout: any }>> => {
-    return apiCall<{ workout: any }>(`/workouts/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(workoutData),
-    });
-  },
+  update: (id: string, workoutData: Partial<Workout>): Promise<ApiResponse<{ workout: Workout }>> =>
+    apiCall<{ workout: Workout }>(`/workouts/${id}`, { method: 'PUT', body: JSON.stringify(workoutData) }),
 
-  delete: async (id: string): Promise<ApiResponse<{ message: string }>> => {
-    return apiCall<{ message: string }>(`/workouts/${id}`, {
-      method: 'DELETE',
-    });
-  },
+  delete: (id: string): Promise<ApiResponse<{ message: string }>> =>
+    apiCall<{ message: string }>(`/workouts/${id}`, { method: 'DELETE' }),
 
-  getStats: async (): Promise<ApiResponse<{
-    totalWorkouts: number;
-    todayWorkouts: number;
-    weeklyWorkouts: number;
-    monthlyWorkouts: number;
-    totalDuration: number;
-    totalCalories: number;
-    averageDuration: number;
-    workoutTypeDistribution: { type: string; count: number }[];
-  }>> => {
-    return apiCall<{
-      totalWorkouts: number;
-      todayWorkouts: number;
-      weeklyWorkouts: number;
-      monthlyWorkouts: number;
-      totalDuration: number;
-      totalCalories: number;
-      averageDuration: number;
-      workoutTypeDistribution: { type: string; count: number }[];
-    }>('/workouts/stats/overview');
-  },
+  getStats: (): Promise<ApiResponse<WorkoutStats>> =>
+    apiCall<WorkoutStats>('/workouts/stats/overview'),
 
-  getMemberHistory: async (memberId: string, params?: {
-    page?: number;
-    limit?: number;
-    startDate?: string;
-    endDate?: string;
-  }): Promise<ApiResponse<{
-    workouts: any[];
-    pagination: {
-      page: number;
-      limit: number;
-      total: number;
-      pages: number;
-    };
-    stats: {
-      totalWorkouts: number;
-      totalDuration: number;
-      totalCalories: number;
-    };
-  }>> => {
+  getMemberHistory: (memberId: string, params?: { page?: number; limit?: number; startDate?: string; endDate?: string }): Promise<ApiResponse<MemberWorkoutHistory>> => {
     const searchParams = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined) {
-          searchParams.append(key, value.toString());
-        }
+        if (value !== undefined) searchParams.append(key, value.toString());
       });
     }
-    
-    const queryString = searchParams.toString();
-    const endpoint = queryString ? `/workouts/member/${memberId}/history?${queryString}` : `/workouts/member/${memberId}/history`;
-    
-    return apiCall<{
-      workouts: any[];
-      pagination: {
-        page: number;
-        limit: number;
-        total: number;
-        pages: number;
-      };
-      stats: {
-        totalWorkouts: number;
-        totalDuration: number;
-        totalCalories: number;
-      };
-    }>(endpoint);
+    const qs = searchParams.toString();
+    const endpoint = qs ? `/workouts/member/${memberId}/history?${qs}` : `/workouts/member/${memberId}/history`;
+    return apiCall<MemberWorkoutHistory>(endpoint);
   },
 };
 
 // Auth token management
 export const tokenManager = {
-  setToken: (token: string) => {
-    localStorage.setItem('authToken', token);
-  },
-
-  getToken: () => {
-    return localStorage.getItem('authToken');
-  },
-
-  removeToken: () => {
-    localStorage.removeItem('authToken');
-  },
-
-  isAuthenticated: () => {
-    return !!localStorage.getItem('authToken');
-  },
+  setToken: (token: string) => localStorage.setItem('authToken', token),
+  getToken: () => localStorage.getItem('authToken'),
+  removeToken: () => localStorage.removeItem('authToken'),
+  isAuthenticated: () => !!localStorage.getItem('authToken'),
 };
 
 export default {
@@ -443,5 +198,3 @@ export default {
   workouts: workoutsAPI,
   tokenManager,
 };
-
-
