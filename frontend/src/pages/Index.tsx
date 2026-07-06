@@ -13,7 +13,7 @@ const Index = () => {
   const { toast } = useToast();
   const { logout } = useAuth();
   const { stats, monthlyStats, loading: dashboardLoading, error: dashboardError } = useDashboardData();
-  const { paymentStats, loading: paymentStatsLoading } = usePaymentStats();
+  const { paymentStats, loading: paymentStatsLoading, recordPT, recordPTLoading } = usePaymentStats();
   const {
     members,
     loading: membersLoading,
@@ -142,7 +142,6 @@ const Index = () => {
       <main className="container mx-auto px-4 py-8 space-y-8">
         <DashboardOverview
           memberCounts={memberCounts}
-          monthlyStats={monthlyStats}
           loading={dashboardLoading}
           error={dashboardError}
         />
@@ -150,6 +149,8 @@ const Index = () => {
           monthlyStats={monthlyStats}
           paymentStats={paymentStats}
           loading={dashboardLoading || paymentStatsLoading}
+          onRecordPT={recordPT}
+          recordPTLoading={recordPTLoading}
         />
       </main>
 

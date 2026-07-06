@@ -1,7 +1,7 @@
 import { ApiResponse, PaginatedResponse, Pagination } from '@/types/api';
 import { LoginRequest, LoginResponse, RegisterRequest } from '@/types/auth';
 import { Member, MemberStats, GetMembersParams } from '@/types/member';
-import { DashboardStats, DashboardOverviewStats, MonthlyStats, MembershipDistribution, GenderDistribution, AgeDistribution, RecentActivity } from '@/types/dashboard';
+import { DashboardStats, DashboardOverviewStats, MonthlyStats, MembershipDistribution, GenderDistribution, AgeDistribution, RecentActivity, DashboardAvailableYears } from '@/types/dashboard';
 import { Payment, PaymentStats, GetPaymentsParams } from '@/types/payment';
 import { Workout, WorkoutStats, MemberWorkoutHistory, GetWorkoutsParams } from '@/types/workout';
 
@@ -94,6 +94,9 @@ export const dashboardAPI = {
     return apiCall<MonthlyStats[]>(endpoint);
   },
 
+  getAvailableYears: (): Promise<ApiResponse<DashboardAvailableYears>> =>
+    apiCall<DashboardAvailableYears>('/dashboard/available-years'),
+
   getMembershipDistribution: (): Promise<ApiResponse<MembershipDistribution[]>> =>
     apiCall<MembershipDistribution[]>('/dashboard/membership-distribution'),
 
@@ -136,6 +139,9 @@ export const paymentsAPI = {
 
   markAsPaid: (id: string, data?: { amount?: number; notes?: string }): Promise<ApiResponse<{ payment: Payment }>> =>
     apiCall<{ payment: Payment }>(`/payments/${id}/mark-paid`, { method: 'PATCH', body: JSON.stringify(data || {}) }),
+
+  recordPT: (data: { memberId: string; amount: number; notes?: string }): Promise<ApiResponse<{ payment: Payment }>> =>
+    apiCall<{ payment: Payment }>('/payments/quick-pt', { method: 'POST', body: JSON.stringify(data) }),
 
   getStats: (): Promise<ApiResponse<PaymentStats>> =>
     apiCall<PaymentStats>('/payments/stats/overview'),

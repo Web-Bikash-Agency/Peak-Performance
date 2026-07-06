@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { dashboardAPI, membersAPI, paymentsAPI } from '@/services/api';
+import { Payment } from '@/types/payment';
 import { Member } from '@/types/member';
 import { DashboardOverviewStats, MonthlyStats } from '@/types/dashboard';
 import { PaymentStats } from '@/types/payment';
@@ -25,7 +26,8 @@ export function useDashboardData(year?: number) {
   const monthlyQuery = useQuery({
     queryKey: queryKeys.dashboardMonthly(year),
     queryFn: () => dashboardAPI.getMonthlyStats(year).then(r => r.data),
-    staleTime: 5 * 60 * 1000, // monthly charts change less often
+    staleTime: 0,                  // always re-fetch on mount so new payments show immediately
+    refetchInterval: 60 * 1000,   // silently re-fetch every 60 seconds
   });
 
   return {
@@ -39,16 +41,31 @@ export function useDashboardData(year?: number) {
 const PAGE_SIZE = 12;
 
 export function usePaymentStats() {
+  const qc = useQueryClient();
   const query = useQuery({
     queryKey: queryKeys.paymentStats,
     queryFn: () => paymentsAPI.getStats().then(r => r.data),
-    staleTime: 60 * 1000,
+    staleTime: 0,
+  });
+
+  const invalidate = () => Promise.all([
+    qc.invalidateQueries({ queryKey: queryKeys.paymentStats }),
+    qc.invalidateQueries({ queryKey: ['dashboard', 'monthly'] }),
+  ]);
+
+  const recordPT = useMutation({
+    mutationFn: (data: { memberId: string; amount: number; notes?: string }) =>
+      paymentsAPI.recordPT(data).then(r => r.data.payment as Payment),
+    onSuccess: invalidate,
   });
 
   return {
     paymentStats: (query.data as PaymentStats) ?? null,
     loading: query.isLoading,
     error: query.error?.message ?? null,
+    recordPT: (data: { memberId: string; amount: number; notes?: string }) =>
+      recordPT.mutateAsync(data),
+    recordPTLoading: recordPT.isPending,
   };
 }
 
@@ -73,6 +90,8 @@ export function useMembers() {
   const invalidate = () => Promise.all([
     qc.invalidateQueries({ queryKey: ['members'] }),
     qc.invalidateQueries({ queryKey: queryKeys.dashboardOverview }),
+    qc.invalidateQueries({ queryKey: ['dashboard', 'monthly'] }),
+    qc.invalidateQueries({ queryKey: queryKeys.paymentStats }),
   ]);
 
   // Flatten all loaded pages into a single list

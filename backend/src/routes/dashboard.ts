@@ -144,6 +144,35 @@ router.get('/monthly-stats', [
   }
 });
 
+// Get years that actually exist in member/payment data
+router.get('/available-years', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const [memberYears, revenueYears] = await Promise.all([
+      prisma.$queryRaw`
+        SELECT DISTINCT EXTRACT(YEAR FROM "joinDate") AS year
+        FROM members
+        ORDER BY year DESC
+      `,
+      prisma.$queryRaw`
+        SELECT DISTINCT EXTRACT(YEAR FROM "paidAt") AS year
+        FROM payments
+        WHERE status = 'PAID' AND "paidAt" IS NOT NULL
+        ORDER BY year DESC
+      `,
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        memberYears: (memberYears as any[]).map(item => Number(item.year)).filter(Boolean),
+        revenueYears: (revenueYears as any[]).map(item => Number(item.year)).filter(Boolean),
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Get membership type distribution
 router.get('/membership-distribution', async (req, res, next) => {
   try {

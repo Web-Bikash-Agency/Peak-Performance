@@ -193,6 +193,14 @@ router.post('/', validateMember, async (req: Request, res: Response, next: NextF
       status = 'EXPIRING_SOON';
     }
 
+    // Membership type → price mapping (must match frontend MEMBERSHIP_INFO)
+    const MEMBERSHIP_PRICES: Record<string, number> = {
+      ONE_MONTH:   600,
+      THREE_MONTH: 1600,
+      SIX_MONTH:   3100,
+      ONE_YEAR:    6600,
+    };
+
     const member = await prisma.member.create({
       data: {
         ...memberData,
@@ -200,6 +208,21 @@ router.post('/', validateMember, async (req: Request, res: Response, next: NextF
         expiryDate: expiryDate
       }
     });
+
+    // Auto-create a PAID payment so revenue charts reflect the new membership
+    const price = MEMBERSHIP_PRICES[memberData.membershipType];
+    if (price) {
+      await prisma.payment.create({
+        data: {
+          memberId: member.id,
+          amount: price,
+          paymentType: 'MEMBERSHIP',
+          status: 'PAID',
+          paidAt: new Date(),
+          dueDate: new Date(),
+        }
+      });
+    }
 
     res.status(201).json({
       success: true,

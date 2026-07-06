@@ -1,16 +1,24 @@
-import { DollarSign, TrendingUp, Clock, AlertCircle } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { DollarSign, TrendingUp, Dumbbell } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
 } from "recharts";
 import { MonthlyStats } from "@/types/dashboard";
 import { PaymentStats } from "@/types/payment";
+import { AddPTPaymentForm } from "./AddPTPaymentForm";
+import { useQuery } from "@tanstack/react-query";
+import { dashboardAPI } from "@/services/api";
 
 interface FinancialOverviewProps {
   monthlyStats: MonthlyStats[];
   paymentStats: PaymentStats | null;
   loading: boolean;
+  onRecordPT: (data: { memberId: string; amount: number; notes?: string }) => Promise<unknown>;
+  recordPTLoading: boolean;
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -18,7 +26,7 @@ const TYPE_LABEL: Record<string, string> = {
   PERSONAL_TRAINING: "Personal Training",
 };
 
-const PIE_COLORS = ["hsl(var(--primary))", "hsl(262 83% 58%)"];
+const PIE_COLORS = ["hsl(262 83% 58%)", "hsl(var(--primary))"];
 
 function formatCurrency(amount: number) {
   if (amount >= 1_000_000) return `₹${(amount / 1_000_000).toFixed(1)}M`;
@@ -65,27 +73,74 @@ function StatCard({
   );
 }
 
-export function FinancialOverview({ monthlyStats, paymentStats, loading }: FinancialOverviewProps) {
+export function FinancialOverview({
+  monthlyStats,
+  paymentStats,
+  loading,
+  onRecordPT,
+  recordPTLoading,
+}: FinancialOverviewProps) {
   const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState(currentYear);
+  const [ptDialogOpen, setPTDialogOpen] = useState(false);
 
-  const revenueData = monthlyStats
-    .filter(s => s.year === currentYear)
-    .map(s => ({ month: s.month, revenue: s.revenue }));
+  const yearsQuery = useQuery({
+    queryKey: ["dashboard", "available-years"],
+    queryFn: () => dashboardAPI.getAvailableYears().then(response => response.data),
+    staleTime: 5 * 60 * 1000,
+  });
 
-  // Only Membership and Personal Training
+  const availableYears = useMemo(
+    () => {
+      const years = [...(yearsQuery.data?.revenueYears ?? []), ...(yearsQuery.data?.memberYears ?? [])];
+      const uniqueYears = [...new Set(years)].sort((a, b) => b - a);
+      return uniqueYears.length > 0 ? uniqueYears : [currentYear, currentYear - 1];
+    },
+    [yearsQuery.data, currentYear]
+  );
+
+  useEffect(() => {
+    if (availableYears.length === 0) return;
+    if (!availableYears.includes(selectedYear)) {
+      setSelectedYear(availableYears[0]);
+    }
+  }, [availableYears, selectedYear]);
+
+  const revenueQuery = useQuery({
+    queryKey: ["dashboard", "monthly-stats", selectedYear],
+    queryFn: () => dashboardAPI.getMonthlyStats(selectedYear).then(response => response.data),
+    staleTime: 0,
+    placeholderData: selectedYear === currentYear ? monthlyStats : undefined,
+  });
+
+  const revenueData = (revenueQuery.data ?? [])
+    .filter(stat => stat.year === selectedYear)
+    .map(stat => ({ month: stat.month, revenue: stat.revenue }));
+
   const distributionData = (paymentStats?.paymentTypeDistribution ?? [])
     .filter(d => d.type === "MEMBERSHIP" || d.type === "PERSONAL_TRAINING")
     .map(d => ({ ...d, label: TYPE_LABEL[d.type] }));
 
   return (
     <section className="space-y-6">
-      <h2 className="text-2xl font-bold flex items-center gap-2 cursor-default">
-        <DollarSign className="w-6 h-6 text-primary" />
-        Financial Overview
-      </h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold flex items-center gap-2 cursor-default">
+          <DollarSign className="w-6 h-6 text-primary" />
+          Financial Overview
+        </h2>
+        <Button
+          variant="premium"
+          size="sm"
+          className="gap-2"
+          onClick={() => setPTDialogOpen(true)}
+        >
+          <Dumbbell className="w-4 h-4" />
+          Record PT
+        </Button>
+      </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard
           icon={TrendingUp}
           label="Total Revenue"
@@ -103,19 +158,11 @@ export function FinancialOverview({ monthlyStats, paymentStats, loading }: Finan
           loading={loading}
         />
         <StatCard
-          icon={Clock}
-          label="Pending Payments"
-          value={paymentStats ? String(paymentStats.pendingPayments) : "—"}
-          sub="Awaiting collection"
-          color="bg-amber-500"
-          loading={loading}
-        />
-        <StatCard
-          icon={AlertCircle}
-          label="Overdue"
-          value={paymentStats ? String(paymentStats.overduePayments) : "—"}
-          sub="Require action"
-          color="bg-destructive"
+          icon={Dumbbell}
+          label="PT Revenue"
+          value={paymentStats ? formatCurrency(paymentStats.ptRevenue) : "—"}
+          sub={paymentStats ? `₹${paymentStats.ptMonthlyRevenue.toLocaleString("en-IN")} this month` : undefined}
+          color="bg-violet-500"
           loading={loading}
         />
       </div>
@@ -124,13 +171,27 @@ export function FinancialOverview({ monthlyStats, paymentStats, loading }: Finan
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Monthly Revenue Area Chart — spans 2 cols */}
         <Card className="animate-fade-in lg:col-span-2">
-          <CardHeader className="p-4 sm:p-6">
-            <CardTitle className="text-lg sm:text-xl font-bold bg-gradient-primary bg-clip-text text-transparent cursor-default">
-              Monthly Revenue
-            </CardTitle>
-            <CardDescription className="cursor-default">
-              Revenue collected per month ({currentYear})
-            </CardDescription>
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 sm:p-6">
+            <div>
+              <CardTitle className="text-lg sm:text-xl font-bold bg-gradient-primary bg-clip-text text-transparent cursor-default">
+                Monthly Revenue
+              </CardTitle>
+              <CardDescription className="cursor-default">
+                Revenue collected per month ({selectedYear})
+              </CardDescription>
+            </div>
+            <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value, 10))}>
+              <SelectTrigger className="w-full sm:w-28">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {availableYears.map(year => (
+                  <SelectItem key={year} value={year.toString()}>
+                    {year}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </CardHeader>
           <CardContent className="p-3 sm:p-6 pt-0">
             <div className="h-64 sm:h-72 w-full">
@@ -180,7 +241,7 @@ export function FinancialOverview({ monthlyStats, paymentStats, loading }: Finan
                     labelStyle={{ color: "hsl(var(--foreground))", fontWeight: "bold" }}
                     cursor={{ stroke: "hsl(var(--border))" }}
                     formatter={(value: number) => [formatCurrency(value), "Revenue"]}
-                    labelFormatter={(label) => `${label} ${currentYear}`}
+                    labelFormatter={(label) => `${label} ${selectedYear}`}
                   />
                   <Area
                     type="monotone"
@@ -221,9 +282,7 @@ export function FinancialOverview({ monthlyStats, paymentStats, loading }: Finan
                     outerRadius="75%"
                     stroke="none"
                     paddingAngle={4}
-                    label={({ label, percent }) =>
-                      `${(percent * 100).toFixed(0)}%`
-                    }
+                    label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
                     labelLine={false}
                   >
                     {distributionData.map((_, i) => (
@@ -231,16 +290,26 @@ export function FinancialOverview({ monthlyStats, paymentStats, loading }: Finan
                     ))}
                   </Pie>
                   <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                      color: "hsl(var(--foreground))",
-                      fontSize: "14px",
-                      padding: "8px 12px",
-                      boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                    content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null;
+                      const entry = payload[0];
+                      const label = (entry.payload as { label?: string })?.label ?? entry.name;
+                      return (
+                        <div style={{
+                          background: "#1a1a2e",
+                          border: "1px solid #2d2d44",
+                          borderRadius: 8,
+                          padding: "8px 12px",
+                          boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.4)",
+                          fontSize: 13,
+                          color: "#f1f5f9",
+                          minWidth: 140,
+                        }}>
+                          <p style={{ fontWeight: 600, marginBottom: 2 }}>{label}</p>
+                          <p style={{ margin: 0 }}>{entry.value} payments</p>
+                        </div>
+                      );
                     }}
-                    formatter={(value: number, name: string) => [value, name]}
                   />
                   <Legend
                     iconType="circle"
@@ -257,6 +326,13 @@ export function FinancialOverview({ monthlyStats, paymentStats, loading }: Finan
           </CardContent>
         </Card>
       </div>
+
+      <AddPTPaymentForm
+        isOpen={ptDialogOpen}
+        onClose={() => setPTDialogOpen(false)}
+        onSave={onRecordPT}
+        saving={recordPTLoading}
+      />
     </section>
   );
 }

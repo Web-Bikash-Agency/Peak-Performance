@@ -66,6 +66,21 @@ router.get('/stats/overview', async (req: Request, res: Response, next: NextFunc
       where: { status: { not: 'CANCELLED' } }
     });
 
+    // PT revenue (all-time and this month)
+    const ptRevenue = await prisma.payment.aggregate({
+      where: { paymentType: 'PERSONAL_TRAINING', status: 'PAID' },
+      _sum: { amount: true }
+    });
+
+    const ptMonthlyRevenue = await prisma.payment.aggregate({
+      where: {
+        paymentType: 'PERSONAL_TRAINING',
+        status: 'PAID',
+        paidAt: { gte: startOfMonth }
+      },
+      _sum: { amount: true }
+    });
+
     res.json({
       success: true,
       data: {
@@ -74,11 +89,55 @@ router.get('/stats/overview', async (req: Request, res: Response, next: NextFunc
         overduePayments,
         totalRevenue: totalRevenue._sum.amount || 0,
         monthlyRevenue: monthlyRevenue._sum.amount || 0,
+        ptRevenue: ptRevenue._sum.amount || 0,
+        ptMonthlyRevenue: ptMonthlyRevenue._sum.amount || 0,
         paymentTypeDistribution: paymentTypeDistribution.map(item => ({
           type: item.paymentType,
           count: item._count.id
         }))
       }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Record a Personal Training payment as instantly PAID
+router.post('/quick-pt', [
+  body('memberId').notEmpty().withMessage('Member ID is required'),
+  body('amount').isFloat({ min: 0.01 }).withMessage('Amount must be greater than 0'),
+  body('notes').optional().trim()
+], async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      const firstError = errors.array()[0];
+      throw new BadRequestError(firstError?.msg || 'Validation error');
+    }
+
+    const { memberId, amount, notes } = req.body;
+
+    const member = await prisma.member.findUnique({ where: { id: memberId } });
+    if (!member) throw new NotFoundError('Member not found');
+
+    const now = new Date();
+    const payment = await prisma.payment.create({
+      data: {
+        memberId,
+        amount: Number(amount),
+        paymentType: 'PERSONAL_TRAINING',
+        status: 'PAID',
+        paidAt: now,
+        dueDate: now,
+        notes: notes || null,
+      },
+      include: { member: { select: { id: true, name: true } } }
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'PT payment recorded successfully',
+      data: { payment }
     });
   } catch (error) {
     next(error);

@@ -30,6 +30,8 @@ export interface PaymentStats {
   overduePayments: number;
   totalRevenue: number;
   monthlyRevenue: number;
+  ptRevenue: number;
+  ptMonthlyRevenue: number;
   paymentTypeDistribution: PaymentTypeDistribution[];
 }
 

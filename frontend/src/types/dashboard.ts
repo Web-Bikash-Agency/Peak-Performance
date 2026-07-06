@@ -20,6 +20,11 @@ export interface MonthlyStats {
   year: number;
 }
 
+export interface DashboardAvailableYears {
+  memberYears: number[];
+  revenueYears: number[];
+}
+
 export interface MembershipDistribution {
   type: string;
   count: number;

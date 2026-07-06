@@ -2,29 +2,46 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { MonthlyStats } from '@/types/dashboard';
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { dashboardAPI } from '@/services/api';
 
-interface MonthlyChartProps {
-  data: MonthlyStats[];
-}
-
-export function MonthlyChart({ data }: MonthlyChartProps) {
-  // FIXED: Default to current year (2025)
-  const currentYear = new Date().getFullYear().toString();
+export function MonthlyChart() {
+  const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear);
 
-  // FIXED: Generate available years dynamically from data
-  const availableYears = [...new Set(data.map(stat => stat.year.toString()))]
-    .sort((a, b) => parseInt(b) - parseInt(a)); // Sort descending (newest first)
+  const yearsQuery = useQuery({
+    queryKey: ['dashboard', 'available-years'],
+    queryFn: () => dashboardAPI.getAvailableYears().then(response => response.data),
+    staleTime: 5 * 60 * 1000,
+  });
 
-  // FIXED: If no data for current year, default to the first available year
+  const availableYears = useMemo(
+    () => {
+      const years = [...(yearsQuery.data?.memberYears ?? []), ...(yearsQuery.data?.revenueYears ?? [])];
+      const uniqueYears = [...new Set(years)].sort((a, b) => b - a);
+      return uniqueYears.length > 0 ? uniqueYears : [currentYear, currentYear - 1];
+    },
+    [yearsQuery.data, currentYear]
+  );
+
   useEffect(() => {
-    if (availableYears.length > 0 && !availableYears.includes(currentYear)) {
+    if (availableYears.length === 0) return;
+    if (!availableYears.includes(selectedYear)) {
       setSelectedYear(availableYears[0]);
     }
-  }, [data, currentYear, availableYears]);
+  }, [availableYears, selectedYear]);
 
-  const filteredData = data.filter(stat => stat.year.toString() === selectedYear);
+  const monthlyQuery = useQuery({
+    queryKey: ['dashboard', 'monthly-stats', selectedYear],
+    queryFn: () => dashboardAPI.getMonthlyStats(selectedYear).then(response => response.data),
+    enabled: availableYears.length === 0 || availableYears.includes(selectedYear),
+    staleTime: 0,
+  });
+
+  const chartData = monthlyQuery.data ?? [];
+  const isLoading = yearsQuery.isLoading || monthlyQuery.isLoading;
+  const isEmpty = availableYears.length === 0;
 
   return (
     <Card className="animate-fade-in w-full">
@@ -37,26 +54,16 @@ export function MonthlyChart({ data }: MonthlyChartProps) {
             Track monthly member acquisition trends
           </CardDescription>
         </div>
-        <Select value={selectedYear} onValueChange={setSelectedYear}>
+        <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value, 10))}>
           <SelectTrigger className="w-full sm:w-24">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {/* FIXED: Dynamic year options from data */}
             {availableYears.map(year => (
-              <SelectItem key={year} value={year}>
+              <SelectItem key={year} value={year.toString()}>
                 {year}
               </SelectItem>
             ))}
-            {/* Fallback: If no data, show current and previous years */}
-            {availableYears.length === 0 && (
-              <>
-                <SelectItem value={currentYear}>{currentYear}</SelectItem>
-                <SelectItem value={(parseInt(currentYear) - 1).toString()}>
-                  {parseInt(currentYear) - 1}
-                </SelectItem>
-              </>
-            )}
           </SelectContent>
         </Select>
       </CardHeader>
@@ -64,7 +71,7 @@ export function MonthlyChart({ data }: MonthlyChartProps) {
         <div className="h-64 sm:h-80 lg:h-96 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
-              data={filteredData}
+              data={chartData}
               margin={{
                 top: 10,
                 right: 10,
@@ -132,6 +139,12 @@ export function MonthlyChart({ data }: MonthlyChartProps) {
             </BarChart>
           </ResponsiveContainer>
         </div>
+        {isLoading && (
+          <p className="mt-3 text-sm text-muted-foreground cursor-default">Loading available years and monthly data...</p>
+        )}
+        {isEmpty && (
+          <p className="mt-3 text-sm text-muted-foreground cursor-default">No member data available yet.</p>
+        )}
       </CardContent>
     </Card>
   );

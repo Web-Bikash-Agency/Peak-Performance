@@ -2,17 +2,15 @@ import { Activity, AlertTriangle, TrendingUp, Users, Loader2 } from "lucide-reac
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { MonthlyChart } from "@/components/dashboard/MonthlyChart";
 import { useNavigate } from "react-router-dom";
-import { MonthlyStats } from "@/types/dashboard";
 import { MemberCounts } from "@/types/member";
 
 interface DashboardOverviewProps {
   memberCounts: MemberCounts;
-  monthlyStats: MonthlyStats[];
   loading: boolean;
   error: string | null;
 }
 
-export const DashboardOverview = ({ memberCounts, monthlyStats, loading, error }: DashboardOverviewProps) => {
+export const DashboardOverview = ({ memberCounts, loading, error }: DashboardOverviewProps) => {
   const navigate = useNavigate();
 
   const handleCardClick = (filter: string) => {
@@ -98,7 +96,7 @@ export const DashboardOverview = ({ memberCounts, monthlyStats, loading, error }
             <p className="text-muted-foreground">{error}</p>
           </div>
         ) : (
-          <MonthlyChart data={monthlyStats} />
+          <MonthlyChart />
         )}
       </section>
     </div>
