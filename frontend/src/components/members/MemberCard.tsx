@@ -6,6 +6,7 @@ import { Edit, Archive, Trash2, Phone, Calendar, Crown } from "lucide-react";
 import { Member } from "@/types/member";
 import { cn } from "@/lib/utils";
 import { MemberStatusSwitch } from "./MemberStatusSwitch";
+import { format } from "date-fns";
 
 interface MemberCardProps {
   member: Member;
@@ -64,7 +65,10 @@ export function MemberCard({ member, onEdit, onArchive, onDelete, onActivate, on
             <Avatar className="w-12 h-12 ring-2 ring-primary/20">
               <AvatarImage src={member.profilePicture} alt={member.name} />
               <AvatarFallback className="bg-gradient-primary text-primary-foreground font-bold">
-                {member.name.split(' ').map(n => n[0]).join('')}
+                {member.name
+                  .split(" ")
+                  .map((n) => n[0])
+                  .join("")}
               </AvatarFallback>
             </Avatar>
             <div>
@@ -108,7 +112,7 @@ export function MemberCard({ member, onEdit, onArchive, onDelete, onActivate, on
           <Badge variant={member.membershipType === 'ONE_YEAR' ? 'default' : 'secondary'}>
             {member.membershipType}
           </Badge>
-          
+
           <div className="flex space-x-1">
             <Button
               variant="ghost"
@@ -122,9 +126,22 @@ export function MemberCard({ member, onEdit, onArchive, onDelete, onActivate, on
               variant="ghost"
               size="sm"
               onClick={() => onArchive(member.id)}
-              className="hover:bg-muted/80"
+              className={
+                member.status === "ARCHIVED"
+                  ? "hover:bg-green-50 hover:text-green-600"
+                  : "hover:bg-muted/80"
+              }
+              title={
+                member.status === "ARCHIVED"
+                  ? "Unarchive Member"
+                  : "Archive Member"
+              }
             >
-              <Archive className="w-4 h-4" />
+              {member.status === "ARCHIVED" ? (
+                <Archive className="w-4 h-4 rotate-180" />
+              ) : (
+                <Archive className="w-4 h-4" />
+              )}
             </Button>
             <Button
               variant="ghost"

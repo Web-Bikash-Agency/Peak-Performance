@@ -2,10 +2,23 @@ import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CalendarIcon, Upload, User, CalendarCheck } from "lucide-react";
 import { format, addMonths, addYears } from "date-fns";
@@ -16,7 +29,6 @@ import { useToast } from "@/hooks/use-toast";
 interface AddMemberFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (member: Omit<Member, 'id'>) => void;
   editingMember?: Member | null;
 }
 
@@ -97,7 +109,6 @@ export function AddMemberForm({ isOpen, onClose, onSave, editingMember }: AddMem
       title: editingMember ? "Member Updated" : "Member Added",
       description: `${formData.name} has been ${editingMember ? 'updated' : 'added'} successfully.`,
     });
-  };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -116,22 +127,28 @@ export function AddMemberForm({ isOpen, onClose, onSave, editingMember }: AddMem
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent cursor-default">
-            {editingMember ? 'Edit Member' : 'Add New Member'}
+            {editingMember ? "Edit Member" : "Add New Member"}
           </DialogTitle>
           <DialogDescription className="cursor-default">
-            {editingMember ? 'Update member information' : 'Enter new member details'}
+            {editingMember ? "Update member information" : "Enter new member details"}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Profile Picture */}
+          {/* Avatar Upload */}
           <div className="flex flex-col items-center space-y-2">
             <Avatar className="w-20 h-20 ring-2 ring-primary/20">
-              <AvatarImage src={formData.profilePicture} />
+              <AvatarImage src={formData.profilePicturePreview} />
               <AvatarFallback className="bg-gradient-primary text-primary-foreground">
-                {formData.name ? formData.name.split(' ').map(n => n[0]).join('') : <User className="w-8 h-8" />}
+                {formData.name
+                  ? formData.name
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")
+                  : <User className="w-8 h-8" />}
               </AvatarFallback>
             </Avatar>
+
             <Label htmlFor="picture" className="cursor-pointer">
               <div className="flex items-center gap-2 text-sm text-primary hover:text-primary/80">
                 <Upload className="w-4 h-4" />
@@ -141,6 +158,7 @@ export function AddMemberForm({ isOpen, onClose, onSave, editingMember }: AddMem
             </Label>
           </div>
 
+          {/* Name + Age */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="name">Name *</Label>
@@ -166,6 +184,7 @@ export function AddMemberForm({ isOpen, onClose, onSave, editingMember }: AddMem
             </div>
           </div>
 
+          {/* Gender */}
           <div>
             <Label htmlFor="gender">Gender</Label>
             <Select value={formData.gender} onValueChange={(v) => setFormData(f => ({ ...f, gender: v }))}>
@@ -180,10 +199,10 @@ export function AddMemberForm({ isOpen, onClose, onSave, editingMember }: AddMem
             </Select>
           </div>
 
+          {/* Email */}
           <div>
             <Label htmlFor="phone">Phone *</Label>
             <Input
-              id="phone"
               value={formData.phone}
               onChange={(e) => setFormData(f => ({ ...f, phone: e.target.value }))}
               placeholder="+91-98000-00000"
@@ -226,13 +245,13 @@ export function AddMemberForm({ isOpen, onClose, onSave, editingMember }: AddMem
                     {formData.joinDate ? format(formData.joinDate, "dd/MM/yyyy") : "Pick date"}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
+
+                <PopoverContent>
                   <Calendar
                     mode="single"
                     selected={formData.joinDate || undefined}
                     onSelect={(date) => setFormData(f => ({ ...f, joinDate: date || null }))}
                     initialFocus
-                    className="pointer-events-auto"
                   />
                 </PopoverContent>
               </Popover>
@@ -260,7 +279,7 @@ export function AddMemberForm({ isOpen, onClose, onSave, editingMember }: AddMem
               Cancel
             </Button>
             <Button type="submit" variant="premium">
-              {editingMember ? 'Update Member' : 'Add Member'}
+              {editingMember ? "Update Member" : "Add Member"}
             </Button>
           </DialogFooter>
         </form>

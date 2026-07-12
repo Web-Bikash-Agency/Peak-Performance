@@ -4,7 +4,7 @@ import { prisma } from '../index';
 import { BadRequestError } from '../middleware/errorHandler';
 import { Request, Response, NextFunction } from 'express';
 
-const router = Router();
+const router: Router = Router();
 
 // Get dashboard overview statistics
 router.get('/overview', async (req, res, next) => {
