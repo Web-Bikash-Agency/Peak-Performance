@@ -4,7 +4,7 @@ import { prisma } from '../index';
 import { BadRequestError, NotFoundError } from '../middleware/errorHandler';
 import { Request, Response, NextFunction } from 'express';
 
-const router = Router();
+const router: Router = Router();
 
 // Validation middleware
 const validateWorkout = [

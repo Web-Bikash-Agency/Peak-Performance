@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { MemberFilters } from "./MemberFilters";
 import { MemberCard } from "./MemberCard";
 import { Member } from "@/types/member";
+import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
 
 interface MembersProps {
   members: Member[];
@@ -28,6 +30,9 @@ interface MembersProps {
   onAdd: () => void;
   onActivate: (id: string) => Promise<void>;
   onDeactivate: (id: string) => Promise<void>;
+  // Optional server-driven pagination
+  onLoadMore?: () => void;
+  hasMore?: boolean;
 }
 
 export const Members = ({
@@ -67,10 +72,10 @@ export const Members = ({
   }, [hasNextPage, isFetchingNextPage, onLoadMore]);
   return (
     <section>
-      <h2 className="text-2xl font-bold mb-6 flex items-center gap-2 cursor-default">
+      <Link to="/" className="text-2xl font-bold mb-6 flex items-center gap-2 cursor-pointer">
         <Users className="w-6 h-6 text-primary" />
         Member Management
-      </h2>
+      </Link>
 
       <MemberFilters
         searchTerm={searchTerm}
@@ -95,19 +100,35 @@ export const Members = ({
           <p className="text-muted-foreground">{membersError}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-          {filteredMembers.map((member) => (
-            <MemberCard
-              key={member.id}
-              member={member}
-              onEdit={onEdit}
-              onArchive={onArchive}
-              onDelete={onDelete}
-              onActivate={onActivate} 
-              onDeactivate={onDeactivate} 
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+            {displayedMembers.map((member) => (
+              <MemberCard
+                key={member.id}
+                member={member}
+                onEdit={onEdit}
+                onArchive={onArchive}
+                onDelete={onDelete}
+                onActivate={onActivate} 
+                onDeactivate={onDeactivate} 
+              />
+            ))}
+          </div>
+
+          {hasMore && (
+            <div className="flex justify-center mt-8">
+              <Button 
+                variant="outline" 
+                size="lg" 
+                onClick={handleShowMore}
+                className="w-full max-w-xs"
+              >
+                <ChevronDown className="w-4 h-4 mr-2" />
+                Show More Members
+              </Button>
+            </div>
+          )}
+        </>
       )}
 
       {/* Scroll sentinel — IntersectionObserver watches this to load next page */}

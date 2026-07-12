@@ -40,7 +40,9 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
   'https://peak-performance-nine.vercel.app',
   'https://peak-performance-git-neon-teamyousuf.vercel.app',
   'http://localhost:8081',
-  'http://localhost:8082'
+  'http://localhost:8082',
+  'https://peak-performance-nine.vercel.app',
+  'https://peak-performance-git-neon-teamyousuf.vercel.app'
 ];
 
 app.use(cors({

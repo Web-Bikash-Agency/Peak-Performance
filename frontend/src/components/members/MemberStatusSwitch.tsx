@@ -58,12 +58,13 @@ export function MemberStatusSwitch({
       {isUpdating ? (
         <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
       ) : (
-        <Switch
-          checked={isActive}
-          onCheckedChange={handleToggle}
-          disabled={disabled || isUpdating}
-          className="data-[state=checked]:bg-green-600"
-        />
+        // <Switch
+        //   checked={isActive}
+        //   onCheckedChange={handleToggle}
+        //   disabled={disabled || isUpdating}
+        //   className="data-[state=checked]:bg-green-600"
+        // />
+        null
       )}
       
       {showLabel && (

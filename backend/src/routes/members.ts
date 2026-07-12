@@ -3,8 +3,27 @@ import { body, query, validationResult } from 'express-validator';
 import { prisma } from '../index';
 import { BadRequestError, NotFoundError } from '../middleware/errorHandler';
 import { Request, Response, NextFunction } from 'express';
+import upload from '../middleware/upload';
+import cloudinary from '../config/cloudinary';
 
-const router = Router();
+const router: Router = Router();
+
+function uploadToCloudinary(fileBuffer: Buffer): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder: "gym-members" },
+      (error, result) => {
+        if (error || !result) {
+          console.error("Cloudinary error:", error);
+          return reject("Cloudinary upload failed");
+        }
+        resolve(result.secure_url);
+      }
+    );
+
+    stream.end(fileBuffer); // Send buffer to Cloudinary
+  });
+}
 
 // Validation middleware
 const validateMember = [
@@ -53,9 +72,7 @@ router.get('/', [
       sortOrder = 'asc'
     } = req.query;
 
-    const skip = (Number(page) - 1) * Number(limit);
-
-    // Build where clause
+    // Build where clause (excluding status filter — will apply in-memory after computing)
     const where: any = {};
     
     if (search) {
@@ -81,14 +98,9 @@ router.get('/', [
       where.membershipType = membershipType;
     }
 
-    // Get total count
-    const total = await prisma.member.count({ where });
-
-    // Get members
-    const members = await prisma.member.findMany({
+    // Fetch all matching members (without pagination yet) to compute status and apply filters
+    const allMembers = await prisma.member.findMany({
       where,
-      skip,
-      take: Number(limit),
       orderBy: { [sortBy as string]: sortOrder },
       select: {
         id: true,
@@ -113,10 +125,47 @@ router.get('/', [
       }
     });
 
+    // Recompute member status based on expiryDate so frontend always sees current status
+    const now = new Date();
+    const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+
+    const computedMembers = allMembers.map(m => {
+      // Preserve archived members
+      if (m.status === 'ARCHIVED') return m;
+
+      // Ensure expiryDate is a Date
+      const expiry = new Date(m.expiryDate);
+
+      let computedStatus: string = 'ACTIVE';
+      if (expiry <= now) {
+        computedStatus = 'INACTIVE';
+      } else if (expiry <= threeDaysFromNow) {
+        computedStatus = 'EXPIRING_SOON';
+      } else {
+        computedStatus = 'ACTIVE';
+      }
+
+      return {
+        ...m,
+        status: computedStatus
+      };
+    });
+
+    // Apply status filter to computed members (in-memory)
+    let filteredMembers = computedMembers;
+    if (status) {
+      filteredMembers = computedMembers.filter(m => m.status === status);
+    }
+
+    // Apply pagination to filtered results
+    const total = filteredMembers.length;
+    const skip = (Number(page) - 1) * Number(limit);
+    const paginatedMembers = filteredMembers.slice(skip, skip + Number(limit));
+
     res.json({
       success: true,
       data: {
-        members,
+        members: paginatedMembers,
         pagination: {
           page: Number(page),
           limit: Number(limit),
@@ -171,7 +220,7 @@ router.get('/:id', async (req, res, next) => {
 });
 
 // Create new member
-router.post('/', validateMember, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', upload.single("profilePicture"), validateMember, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -204,6 +253,7 @@ router.post('/', validateMember, async (req: Request, res: Response, next: NextF
     const member = await prisma.member.create({
       data: {
         ...memberData,
+        profilePicture: imageUrl, 
         status,
         expiryDate: expiryDate
       }
@@ -235,7 +285,7 @@ router.post('/', validateMember, async (req: Request, res: Response, next: NextF
 });
 
 // Update member
-router.put('/:id', validateMemberUpdate, async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id', upload.single("profilePicture"), validateMemberUpdate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -245,6 +295,14 @@ router.put('/:id', validateMemberUpdate, async (req: Request, res: Response, nex
 
     const { id } = req.params;
     const updateData = req.body;
+
+    if (updateData.age) updateData.age = Number(updateData.age);
+    if (updateData.expiryDate) updateData.expiryDate = new Date(updateData.expiryDate);
+
+
+    if (updateData.email === "") {
+      updateData.email = null;
+    }
 
     if (!id) {
       throw new BadRequestError('Member ID is required');
@@ -288,6 +346,7 @@ router.put('/:id', validateMemberUpdate, async (req: Request, res: Response, nex
     next(error);
   }
 });
+
 
 // Delete member
 router.delete('/:id', async (req, res, next) => {
