@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Users, UserCheck, UserX, AlertTriangle, Archive } from "lucide-react";
-import { Member } from "@/types/member";
+import { MemberCounts } from "@/types/member";
 
 interface MemberFiltersProps {
   searchTerm: string;
@@ -11,13 +11,7 @@ interface MemberFiltersProps {
   onStatusFilterChange: (status: string) => void;
   membershipFilter: string;
   onMembershipFilterChange: (type: string) => void;
-  memberCounts: {
-    total: number;
-    active: number;
-    inactive: number;
-    expiringSoon: number;
-    archived: number;
-  };
+  memberCounts: MemberCounts;
 }
 
 export function MemberFilters({
@@ -61,7 +55,7 @@ export function MemberFilters({
     {
       label: "Archived",
       value: "Archived",
-      count: memberCounts.archived,
+      count: memberCounts.archived ?? 0,
       icon: Archive, // ✅ Better icon for archived
       variant: "destructive" as const // ✅ Better variant for archived
     }

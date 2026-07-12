@@ -1,4 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Members } from "@/components/members/Members";
 import { AddMemberForm } from "@/components/members/AddMemberForm";
 import { useToast } from "@/hooks/use-toast";
@@ -8,55 +11,76 @@ import { Member } from "@/types/member";
 import { useSearchParams } from "react-router-dom";
 import { membersAPI } from "@/services/api";
 
+// Map UI filter labels → API status values
+const STATUS_TO_API: Record<string, string | undefined> = {
+  all:      undefined,
+  active:   "ACTIVE",
+  inactive: "INACTIVE",
+  expiring: "EXPIRING_SOON",
+  archived: "ARCHIVED",
+  // display-name aliases sent by MemberFilters
+  "All Members":   undefined,
+  "Active":        "ACTIVE",
+  "Inactive":      "INACTIVE",
+  "Expiring Soon": "EXPIRING_SOON",
+  "Archived":      "ARCHIVED",
+};
+
 export default function MemberManagement() {
   const { toast } = useToast();
   const { logout } = useAuth();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { stats, monthlyStats, loading: dashboardLoading, error: dashboardError } = useDashboardData();
-  
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState(searchParams.get("filter") || "all");
-  
-  // Handle local filter state updates
-  const handleStatusFilterChange = (newFilter: string) => {
-    
-    // ✅ Map display names from Members component to internal filter values
-    const filterMap: { [key: string]: string } = {
-      "All Members": "all",
-      "Active": "active", 
-      "Inactive": "inactive",
-      "Expiring Soon": "expiring",
-      "Archived": "archived", // ✅ Added archived mapping
-      // Also handle lowercase values from URL parameters
-      "all": "all",
-      "active": "active",
-      "inactive": "inactive", 
-      "expiring": "expiring",
-      "archived": "archived"
-    };
-    
-    const mappedFilter = filterMap[newFilter] || newFilter.toLowerCase();
-    
-    setStatusFilter(mappedFilter);
-    setSearchTerm(""); // Clear search when changing filters
-    // Clear URL params when using local filters
-    if (searchParams.get("filter")) {
-      setSearchParams({});
-    }
-  };
+  const { stats } = useDashboardData();
+  const {
+    members,
+    total,
+    loading: membersLoading,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+    error: membersError,
+    fetchMembers,
+    addMember: apiAddMember,
+    updateMember: apiUpdateMember,
+    deleteMember: apiDeleteMember,
+  } = useMembers();
+
+  const [searchTerm, setSearchTerm]           = useState("");
+  const [statusFilter, setStatusFilter]       = useState(searchParams.get("filter") || "all");
   const [membershipFilter, setMembershipFilter] = useState("all");
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
-  const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const [editingMember, setEditingMember]     = useState<Member | null>(null);
 
+  // Sync filter from URL on first load
   useEffect(() => {
     const filter = searchParams.get("filter");
-    if (filter) {
-      setStatusFilter(filter);
-    }
-  }, [searchParams]);
+    if (filter) setStatusFilter(filter);
+  }, []);                                       // run once
 
-  
+  // Re-fetch from server whenever any filter changes
+  useEffect(() => {
+    const apiFilters: Record<string, string> = {};
+    const apiStatus = STATUS_TO_API[statusFilter];
+    if (apiStatus)                    apiFilters.status         = apiStatus;
+    if (searchTerm.trim())            apiFilters.search         = searchTerm.trim();
+    if (membershipFilter !== "all")   apiFilters.membershipType = membershipFilter;
+
+    // Sort expiring members by urgency: expired first, then soonest to expire
+    if (apiStatus === "EXPIRING_SOON") {
+      apiFilters.sortBy    = "expiryDate";
+      apiFilters.sortOrder = "asc";
+    }
+
+    fetchMembers(1, 10, apiFilters);
+  }, [statusFilter, searchTerm, membershipFilter]);
+
+  const handleStatusFilterChange = (newFilter: string) => {
+    setStatusFilter(newFilter);
+    setSearchTerm("");
+    if (searchParams.get("filter")) setSearchParams({});
+  };
 
   // Pagination + server-driven members state
   const [members, setMembers] = useState<Member[]>([]);
@@ -129,55 +153,14 @@ export default function MemberManagement() {
 
   const memberCounts = useMemo(() => {
     if (!stats) return { total: 0, active: 0, inactive: 0, expiringSoon: 0, archived: 0 };
-    
-    // Calculate archived count from members data since stats might not include it
-    const archivedCount = members.filter(m => m.status === "Archived").length;
-    
     return {
-      total: stats.totalMembers,
-      active: stats.activeMembers,
-      inactive: stats.inactiveMembers,
+      total:        stats.totalMembers,
+      active:       stats.activeMembers,
+      inactive:     stats.inactiveMembers,
       expiringSoon: stats.expiringSoon,
-      archived: archivedCount // ✅ Add archived count
+      archived:     0,   // fetched from dashboard API; extend if needed
     };
-  }, [stats, members]);
-
-  const filteredMembers = useMemo(() => {
-    
-    const filtered = members.filter(member => {
-      // Search term matching
-      const matchesSearch = member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (member.email?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
-        (member.phone?.includes(searchTerm) ?? false);
-      
-      // ✅ Status matching with correct uppercase database values
-      let matchesStatus = true;
-      
-      if (statusFilter === "all") {
-        // Show all members except archived (keep current behavior for "All")
-        matchesStatus = member.status !== "Archived";
-      } else if (statusFilter === "active") {
-        matchesStatus = member.status === "Active";
-      } else if (statusFilter === "inactive") {
-        matchesStatus = member.status === "Inactive";
-      } else if (statusFilter === "expiring") {
-        matchesStatus = member.status === "Expiring Soon";
-      } else if (statusFilter === "archived") {
-        // ✅ Show only archived members
-        matchesStatus = member.status === "Archived";
-      } else {
-        // Fallback for any unmapped values
-        console.warn("⚠️ Unmapped filter value:", statusFilter, "- showing all members");
-        matchesStatus = true;
-      }
-      
-      const matchesMembership = membershipFilter === "all" || member.membershipType === membershipFilter;
-      
-      return matchesSearch && matchesStatus && matchesMembership;
-    });
-    
-    return filtered;
-  }, [members, searchTerm, statusFilter, membershipFilter]);
+  }, [stats]);
 
   const handleAddMember = async (memberData: Omit<Member, 'id'>) => {
     try {
@@ -308,49 +291,48 @@ export default function MemberManagement() {
     setEditingMember(null);
   };
 
-  const handleCardClick = (filter: string) => {
-    setStatusFilter(filter);
-    setSearchTerm("");
-    // Clear URL parameter when using local filters
-    if (searchParams.get("filter")) {
-      setSearchParams({});
-    }
-  };
-
   return (
     <div className="space-y-8 space-x-8 mt-8 ml-4 mr-8">
+      <Button variant="outline" size="sm" onClick={() => navigate('/')}>
+        <ArrowLeft className="w-4 h-4 mr-2" />
+        Back to Dashboard
+      </Button>
       {/* Members Section */}
       <Members
         members={members}
-        filteredMembers={filteredMembers}
+        filteredMembers={members}
+        total={total}
         membersLoading={membersLoading}
+        isFetchingNextPage={isFetchingNextPage}
+        hasNextPage={hasNextPage}
+        onLoadMore={fetchNextPage}
         membersError={membersError}
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
         statusFilter={statusFilter}
-        setStatusFilter={handleStatusFilterChange} // ✅ Use the new handler
+        setStatusFilter={handleStatusFilterChange}
         membershipFilter={membershipFilter}
         setMembershipFilter={setMembershipFilter}
         memberCounts={memberCounts}
         onEdit={handleEditMember}
         onArchive={handleArchiveMember}
         onDelete={handleDeleteMember}
-        onActivate={handleActivateMember} // ✅ New prop
-        onDeactivate={handleDeactivateMember} // ✅ New prop
+        onActivate={handleActivateMember}
+        onDeactivate={handleDeactivateMember}
         onAdd={() => setIsAddMemberOpen(true)}
         onLoadMore={handleLoadMore}
         hasMore={pagination.page < pagination.pages}
       />
 
       {/* Add/Edit Member Form */}
-{isAddMemberOpen && (
-  <AddMemberForm
-    isOpen={isAddMemberOpen}           // ✅ Correct prop name
-    onClose={handleCloseForm}          // ✅ Correct prop name  
-    onSave={editingMember ? handleUpdateMember : handleAddMember} // ✅ Correct prop name
-    editingMember={editingMember}      // ✅ Correct prop name
-  />
-)}
+      {isAddMemberOpen && (
+        <AddMemberForm
+          isOpen={isAddMemberOpen}
+          onClose={handleCloseForm}
+          onSave={editingMember ? handleUpdateMember : handleAddMember}
+          editingMember={editingMember}
+        />
+      )}
     </div>
   );
 }

@@ -113,7 +113,6 @@
 
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { prisma } from '../index';
 
 // Extend Express Request interface to include user
 declare global {
@@ -128,72 +127,52 @@ declare global {
   }
 }
 
-export const authMiddleware = async (
+export const authMiddleware = (
   req: Request,
   res: Response,
   next: NextFunction
-): Promise<void> => {
+): void => {
   try {
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      res.status(401).json({
-        success: false,
-        message: 'Access token required'
-      });
+      res.status(401).json({ success: false, message: 'Access token required' });
       return;
     }
 
     const token = authHeader.substring(7);
-    
+
     if (!process.env.JWT_SECRET) {
       throw new Error('JWT_SECRET not configured');
     }
 
+    // Verify signature and expiry — claims were set at login so no DB call needed
     const decoded = jwt.verify(token, process.env.JWT_SECRET) as any;
-    
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.id },
-      select: { id: true, email: true, role: true, isActive: true }
-    });
 
-    if (!user || !user.isActive) {
-      res.status(401).json({
-        success: false,
-        message: 'User not found or inactive'
-      });
+    if (decoded.isActive === false) {
+      res.status(401).json({ success: false, message: 'User account is inactive' });
       return;
     }
 
     req.user = {
-      id: user.id,
-      email: user.email,
-      role: user.role
+      id: decoded.id,
+      email: decoded.email,
+      role: decoded.role
     };
 
     next();
   } catch (error) {
-    if (error instanceof jwt.JsonWebTokenError) {
-      res.status(401).json({
-        success: false,
-        message: 'Invalid token'
-      });
+    if (error instanceof jwt.TokenExpiredError) {
+      res.status(401).json({ success: false, message: 'Token expired' });
       return;
     }
-    
-    if (error instanceof jwt.TokenExpiredError) {
-      res.status(401).json({
-        success: false,
-        message: 'Token expired'
-      });
+    if (error instanceof jwt.JsonWebTokenError) {
+      res.status(401).json({ success: false, message: 'Invalid token' });
       return;
     }
 
     console.error('Auth middleware error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
+    res.status(500).json({ success: false, message: 'Internal server error' });
   }
 };
 
