@@ -1,21 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { authAPI } from '@/services/api';
-
-interface User {
-  id: string;
-  email: string;
-  name: string;
-  role: string;
-}
-
-interface AuthContextType {
-  user: User | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
-}
+import { User, AuthContextType } from '@/types/auth';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 

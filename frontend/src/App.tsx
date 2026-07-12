@@ -9,7 +9,16 @@ import Login from "./pages/Login";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import MemberManagement from "@/pages/MemberManagement"
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 2 * 60 * 1000,   // data is fresh for 2 minutes — no refetch during navigation
+      gcTime: 10 * 60 * 1000,     // keep unused cache for 10 minutes
+      retry: 1,                    // retry failed requests once
+      refetchOnWindowFocus: false, // don't refetch just because the user switched tabs
+    },
+  },
+});
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
