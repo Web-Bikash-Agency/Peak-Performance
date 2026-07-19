@@ -1,3 +1,5 @@
+//AUTH.TS
+
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -6,7 +8,7 @@ import { prisma } from '../index';
 import { BadRequestError, UnauthorizedError, ConflictError } from '../middleware/errorHandler';
 import { Request, Response, NextFunction } from 'express';
 
-const router: Router = Router();
+const router = Router();
 
 // Validation middleware
 const validateRegistration = [
@@ -67,7 +69,7 @@ router.post('/register', validateRegistration, async (req: Request, res: Respons
     }
 
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
+      { id: user.id, email: user.email, role: user.role, isActive: true },
       process.env.JWT_SECRET as string,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
@@ -117,7 +119,7 @@ router.post('/login', validateLogin, async (req: Request, res: Response, next: N
     }
 
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
+      { id: user.id, email: user.email, role: user.role, isActive: user.isActive },
       process.env.JWT_SECRET as string,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
@@ -212,7 +214,7 @@ router.post('/refresh', async (req, res, next) => {
 
     // Generate new token
     const newToken = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
+      { id: user.id, email: user.email, role: user.role, isActive: user.isActive },
       process.env.JWT_SECRET as string,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );

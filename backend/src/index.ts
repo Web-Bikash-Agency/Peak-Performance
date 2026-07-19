@@ -34,13 +34,13 @@ app.use(morgan('combined'));
 
 // CORS configuration
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
-  'http://localhost:3000', 
+  'http://localhost:3000',
   'http://localhost:5173',
   'http://localhost:8080',
-  'http://localhost:8081',
-  'http://localhost:8082',
   'https://peak-performance-nine.vercel.app',
-  'https://peak-performance-git-neon-teamyousuf.vercel.app'
+  'https://peak-performance-git-neon-teamyousuf.vercel.app',
+  'http://localhost:8081',
+  'http://localhost:8082'
 ];
 
 app.use(cors({
@@ -70,8 +70,8 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'OK', 
+  res.status(200).json({
+    status: 'OK',
     timestamp: new Date().toISOString(),
     uptime: process.uptime()
   });
@@ -86,9 +86,9 @@ app.use('/api/workouts', authMiddleware, workoutRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
-  res.status(404).json({ 
-    success: false, 
-    message: 'Route not found' 
+  res.status(404).json({
+    success: false,
+    message: 'Route not found'
   });
 });
 

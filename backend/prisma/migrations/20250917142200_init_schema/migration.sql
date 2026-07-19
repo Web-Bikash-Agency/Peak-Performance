@@ -1,31 +1,31 @@
 -- CreateEnum
-CREATE TYPE "UserRole" AS ENUM ('SUPER_ADMIN', 'ADMIN', 'STAFF');
+CREATE TYPE "public"."UserRole" AS ENUM ('SUPER_ADMIN', 'ADMIN', 'STAFF');
 
 -- CreateEnum
-CREATE TYPE "Gender" AS ENUM ('MALE', 'FEMALE', 'OTHER');
+CREATE TYPE "public"."Gender" AS ENUM ('MALE', 'FEMALE', 'OTHER');
 
 -- CreateEnum
-CREATE TYPE "MembershipType" AS ENUM ('ONE_MONTH', 'THREE_MONTH', 'SIX_MONTH', 'ONE_YEAR');
+CREATE TYPE "public"."MembershipType" AS ENUM ('ONE_MONTH', 'THREE_MONTH', 'SIX_MONTH', 'ONE_YEAR');
 
 -- CreateEnum
-CREATE TYPE "MemberStatus" AS ENUM ('ACTIVE', 'INACTIVE', 'EXPIRING_SOON', 'ARCHIVED');
+CREATE TYPE "public"."MemberStatus" AS ENUM ('ACTIVE', 'INACTIVE', 'EXPIRING_SOON', 'ARCHIVED');
 
 -- CreateEnum
-CREATE TYPE "PaymentType" AS ENUM ('MEMBERSHIP', 'PERSONAL_TRAINING', 'CLASS', 'OTHER');
+CREATE TYPE "public"."PaymentType" AS ENUM ('MEMBERSHIP', 'PERSONAL_TRAINING', 'CLASS', 'OTHER');
 
 -- CreateEnum
-CREATE TYPE "PaymentStatus" AS ENUM ('PENDING', 'PAID', 'OVERDUE', 'CANCELLED');
+CREATE TYPE "public"."PaymentStatus" AS ENUM ('PENDING', 'PAID', 'OVERDUE', 'CANCELLED');
 
 -- CreateEnum
-CREATE TYPE "WorkoutType" AS ENUM ('CARDIO', 'STRENGTH', 'FLEXIBILITY', 'SPORTS', 'OTHER');
+CREATE TYPE "public"."WorkoutType" AS ENUM ('CARDIO', 'STRENGTH', 'FLEXIBILITY', 'SPORTS', 'OTHER');
 
 -- CreateTable
-CREATE TABLE "users" (
+CREATE TABLE "public"."users" (
     "id" TEXT NOT NULL,
     "email" TEXT NOT NULL,
     "password" TEXT NOT NULL,
     "name" TEXT NOT NULL,
-    "role" "UserRole" NOT NULL DEFAULT 'ADMIN',
+    "role" "public"."UserRole" NOT NULL DEFAULT 'ADMIN',
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -34,16 +34,16 @@ CREATE TABLE "users" (
 );
 
 -- CreateTable
-CREATE TABLE "members" (
+CREATE TABLE "public"."members" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "age" INTEGER NOT NULL,
-    "gender" "Gender" NOT NULL,
-    "email" TEXT,
+    "gender" "public"."Gender" NOT NULL,
+    "email" TEXT NOT NULL,
     "phone" TEXT NOT NULL,
-    "membershipType" "MembershipType" NOT NULL,
+    "membershipType" "public"."MembershipType" NOT NULL,
     "expiryDate" TIMESTAMP(3) NOT NULL,
-    "status" "MemberStatus" NOT NULL DEFAULT 'ACTIVE',
+    "status" "public"."MemberStatus" NOT NULL DEFAULT 'ACTIVE',
     "profilePicture" TEXT,
     "joinDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -53,7 +53,7 @@ CREATE TABLE "members" (
 );
 
 -- CreateTable
-CREATE TABLE "check_ins" (
+CREATE TABLE "public"."check_ins" (
     "id" TEXT NOT NULL,
     "memberId" TEXT NOT NULL,
     "checkInAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -64,12 +64,12 @@ CREATE TABLE "check_ins" (
 );
 
 -- CreateTable
-CREATE TABLE "payments" (
+CREATE TABLE "public"."payments" (
     "id" TEXT NOT NULL,
     "memberId" TEXT NOT NULL,
     "amount" DOUBLE PRECISION NOT NULL,
-    "paymentType" "PaymentType" NOT NULL,
-    "status" "PaymentStatus" NOT NULL DEFAULT 'PENDING',
+    "paymentType" "public"."PaymentType" NOT NULL,
+    "status" "public"."PaymentStatus" NOT NULL DEFAULT 'PENDING',
     "dueDate" TIMESTAMP(3) NOT NULL,
     "paidAt" TIMESTAMP(3),
     "notes" TEXT,
@@ -80,10 +80,10 @@ CREATE TABLE "payments" (
 );
 
 -- CreateTable
-CREATE TABLE "workouts" (
+CREATE TABLE "public"."workouts" (
     "id" TEXT NOT NULL,
     "memberId" TEXT NOT NULL,
-    "workoutType" "WorkoutType" NOT NULL,
+    "workoutType" "public"."WorkoutType" NOT NULL,
     "duration" INTEGER NOT NULL,
     "calories" INTEGER,
     "notes" TEXT,
@@ -95,7 +95,7 @@ CREATE TABLE "workouts" (
 );
 
 -- CreateTable
-CREATE TABLE "membership_plans" (
+CREATE TABLE "public"."membership_plans" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "description" TEXT,
@@ -110,16 +110,16 @@ CREATE TABLE "membership_plans" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
+CREATE UNIQUE INDEX "users_email_key" ON "public"."users"("email");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "members_email_key" ON "members"("email");
+CREATE UNIQUE INDEX "members_email_key" ON "public"."members"("email");
 
 -- AddForeignKey
-ALTER TABLE "check_ins" ADD CONSTRAINT "check_ins_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "public"."check_ins" ADD CONSTRAINT "check_ins_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "public"."members"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "payments" ADD CONSTRAINT "payments_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "public"."payments" ADD CONSTRAINT "payments_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "public"."members"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "workouts" ADD CONSTRAINT "workouts_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "members"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "public"."workouts" ADD CONSTRAINT "workouts_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "public"."members"("id") ON DELETE CASCADE ON UPDATE CASCADE;

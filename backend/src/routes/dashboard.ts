@@ -4,78 +4,48 @@ import { prisma } from '../index';
 import { BadRequestError } from '../middleware/errorHandler';
 import { Request, Response, NextFunction } from 'express';
 
-const router: Router = Router();
+const router = Router();
 
 // Get dashboard overview statistics
 router.get('/overview', async (req, res, next) => {
   try {
-    // Get total members count
-    const totalMembers = await prisma.member.count();
-
-    // Get active members count
-    const activeMembers = await prisma.member.count({
-      where: { status: 'ACTIVE' }
-    });
-
-    // Get inactive members count
-    const inactiveMembers = await prisma.member.count({
-      where: { status: 'INACTIVE' }
-    });
-
-    // Get expiring soon members count (within 30 days)
-    const fifteenDaysFromNow = new Date();
-    fifteenDaysFromNow.setDate(fifteenDaysFromNow.getDate() + 15);
-
-    const expiringSoon = await prisma.member.count({
-      where: {
-        status: 'ACTIVE',
-        expiryDate: {
-          lte: fifteenDaysFromNow,
-          gte: new Date()
-        }
-      }
-    });
-
-    // Get today's check-ins
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const todayCheckIns = await prisma.checkIn.count({
-      where: {
-        checkInAt: {
-          gte: today,
-          lt: tomorrow
-        }
-      }
-    });
-
-    // Get this month's revenue
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
 
-    const monthlyRevenue = await prisma.payment.aggregate({
-      where: {
-        status: 'PAID',
-        paidAt: {
-          gte: startOfMonth
+    const [
+      totalMembers,
+      activeMembers,
+      inactiveMembers,
+      expiringSoon,
+      todayCheckIns,
+      monthlyRevenue,
+      newMembersThisMonth
+    ] = await prisma.$transaction([
+      prisma.member.count(),
+      prisma.member.count({ where: { status: 'ACTIVE' } }),
+      prisma.member.count({ where: { status: 'INACTIVE' } }),
+      // expiringSoon = expires within the next 3 days (date-based, always accurate)
+      prisma.member.count({
+        where: {
+          expiryDate: { gte: new Date(), lte: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) },
+          status: { not: 'ARCHIVED' }
         }
-      },
-      _sum: {
-        amount: true
-      }
-    });
-
-    // Get this month's new members
-    const newMembersThisMonth = await prisma.member.count({
-      where: {
-        joinDate: {
-          gte: startOfMonth
-        }
-      }
-    });
+      }),
+      prisma.checkIn.count({
+        where: { checkInAt: { gte: today, lt: tomorrow } }
+      }),
+      prisma.payment.aggregate({
+        where: { status: 'PAID', paidAt: { gte: startOfMonth } },
+        _sum: { amount: true }
+      }),
+      prisma.member.count({ where: { joinDate: { gte: startOfMonth } } })
+    ]);
 
     res.json({
       success: true,
@@ -107,58 +77,53 @@ router.get('/monthly-stats', [
 
     const year = parseInt(req.query.year as string) || new Date().getFullYear();
 
-    const monthlyStats = await prisma.$queryRaw`
-      SELECT 
-        EXTRACT(MONTH FROM "joinDate") as month,
-        COUNT(*) as newMembers
-      FROM members 
-      WHERE EXTRACT(YEAR FROM "joinDate") = ${year}
-      GROUP BY EXTRACT(MONTH FROM "joinDate")
-      ORDER BY month
-    `;
+    const [monthlyStats, monthlyRevenue, monthlyCheckIns] = await Promise.all([
+      prisma.$queryRaw`
+        SELECT
+          EXTRACT(MONTH FROM "joinDate") as month,
+          COUNT(*) as newmembers
+        FROM members
+        WHERE EXTRACT(YEAR FROM "joinDate") = ${year}
+        GROUP BY EXTRACT(MONTH FROM "joinDate")
+        ORDER BY month
+      `,
+      prisma.$queryRaw`
+        SELECT
+          EXTRACT(MONTH FROM "paidAt") as month,
+          COALESCE(SUM(amount), 0) as revenue
+        FROM payments
+        WHERE EXTRACT(YEAR FROM "paidAt") = ${year}
+          AND status = 'PAID'
+        GROUP BY EXTRACT(MONTH FROM "paidAt")
+        ORDER BY month
+      `,
+      prisma.$queryRaw`
+        SELECT
+          EXTRACT(MONTH FROM "checkInAt") as month,
+          COUNT(*) as checkins
+        FROM check_ins
+        WHERE EXTRACT(YEAR FROM "checkInAt") = ${year}
+        GROUP BY EXTRACT(MONTH FROM "checkInAt")
+        ORDER BY month
+      `
+    ]);
 
-    // Get monthly revenue
-    const monthlyRevenue = await prisma.$queryRaw`
-      SELECT 
-        EXTRACT(MONTH FROM "paidAt") as month,
-        COALESCE(SUM(amount), 0) as revenue
-      FROM payments 
-      WHERE EXTRACT(YEAR FROM "paidAt") = ${year}
-        AND status = 'PAID'
-      GROUP BY EXTRACT(MONTH FROM "paidAt")
-      ORDER BY month
-    `;
-
-    // Get monthly check-ins
-    const monthlyCheckIns = await prisma.$queryRaw`
-      SELECT 
-        EXTRACT(MONTH FROM "checkInAt") as month,
-        COUNT(*) as checkIns
-      FROM check_ins 
-      WHERE EXTRACT(YEAR FROM "checkInAt") = ${year}
-      GROUP BY EXTRACT(MONTH FROM "checkInAt")
-      ORDER BY month
-    `;
-
-    // Format data for frontend
     const monthNames = [
       'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
     ];
 
-    // FIXED: Properly format the stats with year included and handle BigInt
     const formattedStats = monthNames.map((month, index) => {
       const monthNumber = index + 1;
-      
-      // FIXED: Handle BigInt conversion properly
+
       const monthData = (monthlyStats as any[]).find(s => Number(s.month) === monthNumber);
-      const newMembers = monthData ? Number(monthData.newmembers) : 0; // Note: PostgreSQL returns lowercase 'newmembers'
-      
+      const newMembers = monthData ? Number(monthData.newmembers) : 0;
+
       const revenueData = (monthlyRevenue as any[]).find(s => Number(s.month) === monthNumber);
       const revenue = revenueData ? Number(revenueData.revenue) : 0;
-      
+
       const checkInData = (monthlyCheckIns as any[]).find(s => Number(s.month) === monthNumber);
-      const checkIns = checkInData ? Number(checkInData.checkIns) : 0;
+      const checkIns = checkInData ? Number(checkInData.checkins) : 0;
 
       return {
         month,
@@ -166,7 +131,7 @@ router.get('/monthly-stats', [
         newMembers,
         revenue: parseFloat(revenue.toString()),
         checkIns,
-        year: year // Include the requested year in each data point
+        year
       };
     });
 
@@ -179,29 +144,50 @@ router.get('/monthly-stats', [
   }
 });
 
+// Get years that actually exist in member/payment data
+router.get('/available-years', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const [memberYears, revenueYears] = await Promise.all([
+      prisma.$queryRaw`
+        SELECT DISTINCT EXTRACT(YEAR FROM "joinDate") AS year
+        FROM members
+        ORDER BY year DESC
+      `,
+      prisma.$queryRaw`
+        SELECT DISTINCT EXTRACT(YEAR FROM "paidAt") AS year
+        FROM payments
+        WHERE status = 'PAID' AND "paidAt" IS NOT NULL
+        ORDER BY year DESC
+      `,
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        memberYears: (memberYears as any[]).map(item => Number(item.year)).filter(Boolean),
+        revenueYears: (revenueYears as any[]).map(item => Number(item.year)).filter(Boolean),
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Get membership type distribution
 router.get('/membership-distribution', async (req, res, next) => {
   try {
     const distribution = await prisma.member.groupBy({
       by: ['membershipType'],
-      _count: {
-        id: true
-      },
-      where: {
-        status: {
-          not: 'ARCHIVED'
-        }
-      }
+      _count: { id: true },
+      where: { status: { not: 'ARCHIVED' } }
     });
-
-    const formattedDistribution = distribution.map(item => ({
-      type: item.membershipType,
-      count: item._count.id
-    }));
 
     res.json({
       success: true,
-      data: formattedDistribution
+      data: distribution.map(item => ({
+        type: item.membershipType,
+        count: item._count.id
+      }))
     });
   } catch (error) {
     next(error);
@@ -213,66 +199,46 @@ router.get('/gender-distribution', async (req, res, next) => {
   try {
     const distribution = await prisma.member.groupBy({
       by: ['gender'],
-      _count: {
-        id: true
-      },
-      where: {
-        status: {
-          not: 'ARCHIVED'
-        }
-      }
+      _count: { id: true },
+      where: { status: { not: 'ARCHIVED' } }
     });
-
-    const formattedDistribution = distribution.map(item => ({
-      gender: item.gender,
-      count: item._count.id
-    }));
 
     res.json({
       success: true,
-      data: formattedDistribution
+      data: distribution.map(item => ({
+        gender: item.gender,
+        count: item._count.id
+      }))
     });
   } catch (error) {
     next(error);
   }
 });
 
-// Get age distribution
+// Get age distribution — single SQL query with CASE WHEN instead of 5 separate counts
 router.get('/age-distribution', async (req, res, next) => {
   try {
-    const ageRanges = [
-      { min: 16, max: 25, label: '16-25' },
-      { min: 26, max: 35, label: '26-35' },
-      { min: 36, max: 45, label: '36-45' },
-      { min: 46, max: 55, label: '46-55' },
-      { min: 56, max: 100, label: '56+' }
+    const result = await prisma.$queryRaw`
+      SELECT
+        SUM(CASE WHEN age BETWEEN 16 AND 25 THEN 1 ELSE 0 END) AS "16-25",
+        SUM(CASE WHEN age BETWEEN 26 AND 35 THEN 1 ELSE 0 END) AS "26-35",
+        SUM(CASE WHEN age BETWEEN 36 AND 45 THEN 1 ELSE 0 END) AS "36-45",
+        SUM(CASE WHEN age BETWEEN 46 AND 55 THEN 1 ELSE 0 END) AS "46-55",
+        SUM(CASE WHEN age >= 56 THEN 1 ELSE 0 END)             AS "56+"
+      FROM members
+      WHERE status != 'ARCHIVED'
+    `;
+
+    const row = (result as any[])[0] || {};
+    const distribution = [
+      { range: '16-25', count: Number(row['16-25'] || 0) },
+      { range: '26-35', count: Number(row['26-35'] || 0) },
+      { range: '36-45', count: Number(row['36-45'] || 0) },
+      { range: '46-55', count: Number(row['46-55'] || 0) },
+      { range: '56+',   count: Number(row['56+']   || 0) }
     ];
 
-    const distribution = await Promise.all(
-      ageRanges.map(async (range) => {
-        const count = await prisma.member.count({
-          where: {
-            age: {
-              gte: range.min,
-              lte: range.max
-            },
-            status: {
-              not: 'ARCHIVED'
-            }
-          }
-        });
-
-        return {
-          range: range.label,
-          count
-        };
-      })
-    );
-
-    res.json({
-      success: true,
-      data: distribution
-    });
+    res.json({ success: true, data: distribution });
   } catch (error) {
     next(error);
   }
@@ -291,52 +257,26 @@ router.get('/recent-activities', [
 
     const limit = parseInt(req.query.limit as string) || 20;
 
-    // Get recent check-ins
-    const recentCheckIns = await prisma.checkIn.findMany({
-      take: limit,
-      orderBy: { checkInAt: 'desc' },
-      include: {
-        member: {
-          select: {
-            id: true,
-            name: true,
-            profilePicture: true
-          }
-        }
-      }
-    });
+    const memberSelect = { select: { id: true, name: true, profilePicture: true } };
 
-    // Get recent payments
-    const recentPayments = await prisma.payment.findMany({
-      take: limit,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        member: {
-          select: {
-            id: true,
-            name: true,
-            profilePicture: true
-          }
-        }
-      }
-    });
+    const [recentCheckIns, recentPayments, recentWorkouts] = await Promise.all([
+      prisma.checkIn.findMany({
+        take: limit,
+        orderBy: { checkInAt: 'desc' },
+        include: { member: memberSelect }
+      }),
+      prisma.payment.findMany({
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: { member: memberSelect }
+      }),
+      prisma.workout.findMany({
+        take: limit,
+        orderBy: { workoutAt: 'desc' },
+        include: { member: memberSelect }
+      })
+    ]);
 
-    // Get recent workouts
-    const recentWorkouts = await prisma.workout.findMany({
-      take: limit,
-      orderBy: { workoutAt: 'desc' },
-      include: {
-        member: {
-          select: {
-            id: true,
-            name: true,
-            profilePicture: true
-          }
-        }
-      }
-    });
-
-    // Combine and sort all activities
     const allActivities = [
       ...recentCheckIns.map(ci => ({
         type: 'CHECK_IN',
@@ -356,17 +296,14 @@ router.get('/recent-activities', [
         member: w.member,
         data: { duration: w.duration, workoutType: w.workoutType }
       }))
-    ].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
-    .slice(0, limit);
+    ]
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+      .slice(0, limit);
 
-    res.json({
-      success: true,
-      data: allActivities
-    });
+    res.json({ success: true, data: allActivities });
   } catch (error) {
     next(error);
   }
 });
 
 export default router;
-

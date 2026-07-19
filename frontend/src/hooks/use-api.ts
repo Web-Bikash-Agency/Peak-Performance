@@ -1,113 +1,136 @@
-import { useState, useEffect } from 'react';
-import { dashboardAPI, membersAPI } from '@/services/api';
-import { DashboardStats, Member, MonthlyStats } from '@/types/member';
+import { useState } from 'react';
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { dashboardAPI, membersAPI, paymentsAPI } from '@/services/api';
+import { Payment } from '@/types/payment';
+import { Member } from '@/types/member';
+import { DashboardOverviewStats, MonthlyStats } from '@/types/dashboard';
+import { PaymentStats } from '@/types/payment';
 
-export function useDashboardData() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [monthlyStats, setMonthlyStats] = useState<MonthlyStats[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+// Query keys — centralised so invalidations always match
+export const queryKeys = {
+  dashboardOverview: ['dashboard', 'overview'] as const,
+  dashboardMonthly: (year?: number) => ['dashboard', 'monthly', year] as const,
+  members: (page: number, limit: number, filters: object) =>
+    ['members', page, limit, filters] as const,
+  paymentStats: ['payments', 'stats'] as const,
+};
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+export function useDashboardData(year?: number) {
+  const overviewQuery = useQuery({
+    queryKey: queryKeys.dashboardOverview,
+    queryFn: () => dashboardAPI.getOverview().then(r => r.data),
+    staleTime: 0,                  // always re-fetch on mount
+    refetchInterval: 60 * 1000,   // silently re-fetch every 60 seconds
+  });
 
-        // Fetch dashboard overview
-        const overviewResponse = await dashboardAPI.getOverview();
-        setStats(overviewResponse.data);
+  const monthlyQuery = useQuery({
+    queryKey: queryKeys.dashboardMonthly(year),
+    queryFn: () => dashboardAPI.getMonthlyStats(year).then(r => r.data),
+    staleTime: 0,                  // always re-fetch on mount so new payments show immediately
+    refetchInterval: 60 * 1000,   // silently re-fetch every 60 seconds
+  });
 
-        // Fetch monthly stats
-        const monthlyResponse = await dashboardAPI.getMonthlyStats();
-        setMonthlyStats(monthlyResponse.data);
+  return {
+    stats: (overviewQuery.data as DashboardOverviewStats) ?? null,
+    monthlyStats: (monthlyQuery.data as MonthlyStats[]) ?? [],
+    loading: overviewQuery.isLoading || monthlyQuery.isLoading,
+    error: overviewQuery.error?.message || monthlyQuery.error?.message || null,
+  };
+}
 
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch dashboard data');
-        console.error('Dashboard data fetch error:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
+const PAGE_SIZE = 12;
 
-    fetchDashboardData();
-  }, []);
+export function usePaymentStats() {
+  const qc = useQueryClient();
+  const query = useQuery({
+    queryKey: queryKeys.paymentStats,
+    queryFn: () => paymentsAPI.getStats().then(r => r.data),
+    staleTime: 0,
+  });
 
-  return { stats, monthlyStats, loading, error };
+  const invalidate = () => Promise.all([
+    qc.invalidateQueries({ queryKey: queryKeys.paymentStats }),
+    qc.invalidateQueries({ queryKey: ['dashboard', 'monthly'] }),
+  ]);
+
+  const recordPT = useMutation({
+    mutationFn: (data: { memberId: string; amount: number; notes?: string }) =>
+      paymentsAPI.recordPT(data).then(r => r.data.payment as Payment),
+    onSuccess: invalidate,
+  });
+
+  return {
+    paymentStats: (query.data as PaymentStats) ?? null,
+    loading: query.isLoading,
+    error: query.error?.message ?? null,
+    recordPT: (data: { memberId: string; amount: number; notes?: string }) =>
+      recordPT.mutateAsync(data),
+    recordPTLoading: recordPT.isPending,
+  };
 }
 
 export function useMembers() {
-  const [members, setMembers] = useState<Member[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 10,
-    total: 0,
-    pages: 0
+  const qc = useQueryClient();
+  const [filters, setFilters] = useState<Record<string, string>>({});
+
+  const query = useInfiniteQuery({
+    queryKey: queryKeys.members(1, PAGE_SIZE, filters),
+    queryFn: ({ pageParam = 1 }) =>
+      membersAPI
+        .getAll({ page: pageParam as number, limit: PAGE_SIZE, ...filters })
+        .then(r => r.data),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => {
+      const { page, pages } = lastPage.pagination;
+      return page < pages ? page + 1 : undefined;
+    },
+    staleTime: 60 * 1000,
   });
 
-  const fetchMembers = async (page = 1, limit = 10, filters = {}) => {
-    try {
-      setLoading(true);
-      setError(null);
+  const invalidate = () => Promise.all([
+    qc.invalidateQueries({ queryKey: ['members'] }),
+    qc.invalidateQueries({ queryKey: queryKeys.dashboardOverview }),
+    qc.invalidateQueries({ queryKey: ['dashboard', 'monthly'] }),
+    qc.invalidateQueries({ queryKey: queryKeys.paymentStats }),
+  ]);
 
-      const response = await membersAPI.getAll(page, limit, filters);
-      setMembers(response.data.members);
-      setPagination(response.data.pagination);
+  // Flatten all loaded pages into a single list
+  const pages = query.data?.pages ?? [];
+  const members: Member[] = pages.flatMap(p => p.members) ?? [];
+  const lastPage = pages[pages.length - 1];
+  const total: number = lastPage?.pagination.total ?? 0;
 
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch members');
-      console.error('Members fetch error:', err);
-    } finally {
-      setLoading(false);
-    }
+  const fetchMembers = (_page = 1, _limit = PAGE_SIZE, newFilters: Record<string, string> = {}) => {
+    setFilters(newFilters);
   };
 
-  const addMember = async (memberData: Omit<Member, 'id'>) => {
-    try {
-      const response = await membersAPI.create(memberData);
-      // Refresh the current page
-      await fetchMembers(pagination.page, pagination.limit);
-      return response;
-    } catch (err) {
-      throw err;
-    }
-  };
+  const addMember = useMutation({
+    mutationFn: (memberData: Omit<Member, 'id'>) => membersAPI.create(memberData),
+    onSuccess: invalidate,
+  });
 
-  const updateMember = async (id: string, memberData: Partial<Member>) => {
-    try {
-      const response = await membersAPI.update(id, memberData);
-      // Refresh the current page
-      await fetchMembers(pagination.page, pagination.limit);
-      return response;
-    } catch (err) {
-      throw err;
-    }
-  };
+  const updateMember = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<Member> }) =>
+      membersAPI.update(id, data),
+    onSuccess: invalidate,
+  });
 
-  const deleteMember = async (id: string) => {
-    try {
-      await membersAPI.delete(id);
-      // Refresh the current page
-      await fetchMembers(pagination.page, pagination.limit);
-    } catch (err) {
-      throw err;
-    }
-  };
-
-  useEffect(() => {
-    fetchMembers();
-  }, []);
+  const deleteMember = useMutation({
+    mutationFn: (id: string) => membersAPI.delete(id),
+    onSuccess: invalidate,
+  });
 
   return {
     members,
-    loading,
-    error,
-    pagination,
+    total,
+    loading: query.isLoading,
+    isFetchingNextPage: query.isFetchingNextPage,
+    hasNextPage: query.hasNextPage,
+    fetchNextPage: query.fetchNextPage,
+    error: query.error?.message ?? null,
     fetchMembers,
-    addMember,
-    updateMember,
-    deleteMember
+    addMember: (data: Omit<Member, 'id'>) => addMember.mutateAsync(data),
+    updateMember: (id: string, data: Partial<Member>) => updateMember.mutateAsync({ id, data }),
+    deleteMember: (id: string) => deleteMember.mutateAsync(id),
   };
 }

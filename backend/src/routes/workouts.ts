@@ -4,7 +4,7 @@ import { prisma } from '../index';
 import { BadRequestError, NotFoundError } from '../middleware/errorHandler';
 import { Request, Response, NextFunction } from 'express';
 
-const router: Router = Router();
+const router = Router();
 
 // Validation middleware
 const validateWorkout = [
@@ -56,7 +56,7 @@ router.get('/', [
 
     // Build where clause
     const where: any = {};
-    
+
     if (memberId) {
       where.memberId = memberId;
     }
@@ -89,7 +89,6 @@ router.get('/', [
           select: {
             id: true,
             name: true,
-            email: true,
             profilePicture: true
           }
         }
@@ -107,169 +106,6 @@ router.get('/', [
           pages: Math.ceil(total / Number(limit))
         }
       }
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// Get workout by ID
-router.get('/:id', async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
-    const workout = await prisma.workout.findUnique({
-      where: { id },
-      include: {
-        member: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true,
-            profilePicture: true
-          }
-        }
-      }
-    });
-
-    if (!workout) {
-      throw new NotFoundError('Workout not found');
-    }
-
-    res.json({
-      success: true,
-      data: { workout }
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// Create new workout
-router.post('/', validateWorkout, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      const firstError = errors.array()[0];
-      throw new BadRequestError(firstError?.msg || 'Validation error');
-    }
-
-    const workoutData = req.body;
-
-    // Check if member exists
-    const member = await prisma.member.findUnique({
-      where: { id: workoutData.memberId }
-    });
-
-    if (!member) {
-      throw new NotFoundError('Member not found');
-    }
-
-    // Set workout date to now if not provided
-    if (!workoutData.workoutAt) {
-      workoutData.workoutAt = new Date();
-    }
-
-    const workout = await prisma.workout.create({
-      data: workoutData,
-      include: {
-        member: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        }
-      }
-    });
-
-    res.status(201).json({
-      success: true,
-      message: 'Workout recorded successfully',
-      data: { workout }
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// Update workout
-router.put('/:id', validateWorkoutUpdate, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      const firstError = errors.array()[0];
-      throw new BadRequestError(firstError?.msg || 'Validation error');
-    }
-
-    const { id } = req.params;
-    const updateData = req.body;
-
-    // Ensure id is not undefined
-    if (!id) {
-      throw new BadRequestError('Workout ID is required');
-    }
-
-    // Check if workout exists
-    const existingWorkout = await prisma.workout.findUnique({
-      where: { id }
-    });
-
-    if (!existingWorkout) {
-      throw new NotFoundError('Workout not found');
-    }
-
-    const workout = await prisma.workout.update({
-      where: { id },
-      data: updateData,
-      include: {
-        member: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        }
-      }
-    });
-
-    res.json({
-      success: true,
-      message: 'Workout updated successfully',
-      data: { workout }
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// Delete workout
-router.delete('/:id', async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
-    // Ensure id is not undefined
-    if (!id) {
-      throw new BadRequestError('Workout ID is required');
-    }
-
-    // Check if workout exists
-    const workout = await prisma.workout.findUnique({
-      where: { id }
-    });
-
-    if (!workout) {
-      throw new NotFoundError('Workout not found');
-    }
-
-    await prisma.workout.delete({
-      where: { id }
-    });
-
-    res.json({
-      success: true,
-      message: 'Workout deleted successfully'
     });
   } catch (error) {
     next(error);
@@ -403,7 +239,7 @@ router.get('/member/:memberId/history', [
 
     // Build where clause
     const where: any = { memberId };
-    
+
     if (startDate || endDate) {
       where.workoutAt = {};
       if (startDate) {
@@ -432,8 +268,8 @@ router.get('/member/:memberId/history', [
         duration: true,
         calories: true
       },
-      _count: { 
-        id: true 
+      _count: {
+        id: true
       }
     });
 
@@ -459,4 +295,167 @@ router.get('/member/:memberId/history', [
   }
 });
 
+// Get workout by ID
+router.get('/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      throw new BadRequestError('Workout ID is required');
+    }
+
+    const workout = await prisma.workout.findUnique({
+      where: { id },
+      include: {
+        member: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            profilePicture: true,
+          },
+        },
+      },
+    });
+
+    if (!workout) {
+      throw new NotFoundError('Workout not found');
+    }
+
+    res.json({
+      success: true,
+      data: { workout },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Create new workout
+router.post('/', validateWorkout, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      const firstError = errors.array()[0];
+      throw new BadRequestError(firstError?.msg || 'Validation error');
+    }
+
+    const workoutData = req.body;
+
+    // Check if member exists
+    const member = await prisma.member.findUnique({
+      where: { id: workoutData.memberId }
+    });
+
+    if (!member) {
+      throw new NotFoundError('Member not found');
+    }
+
+    // Set workout date to now if not provided
+    if (!workoutData.workoutAt) {
+      workoutData.workoutAt = new Date();
+    }
+
+    const workout = await prisma.workout.create({
+      data: workoutData,
+      include: {
+        member: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      }
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Workout recorded successfully',
+      data: { workout }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Update workout
+router.put('/:id', validateWorkoutUpdate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      const firstError = errors.array()[0];
+      throw new BadRequestError(firstError?.msg || 'Validation error');
+    }
+
+    const { id } = req.params;
+    const updateData = req.body;
+
+    // Ensure id is not undefined
+    if (!id) {
+      throw new BadRequestError('Workout ID is required');
+    }
+
+    // Check if workout exists
+    const existingWorkout = await prisma.workout.findUnique({
+      where: { id }
+    });
+
+    if (!existingWorkout) {
+      throw new NotFoundError('Workout not found');
+    }
+
+    const workout = await prisma.workout.update({
+      where: { id },
+      data: updateData,
+      include: {
+        member: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Workout updated successfully',
+      data: { workout }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Delete workout
+router.delete('/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // Ensure id is not undefined
+    if (!id) {
+      throw new BadRequestError('Workout ID is required');
+    }
+
+    // Check if workout exists
+    const workout = await prisma.workout.findUnique({
+      where: { id }
+    });
+
+    if (!workout) {
+      throw new NotFoundError('Workout not found');
+    }
+
+    await prisma.workout.delete({
+      where: { id }
+    });
+
+    res.json({
+      success: true,
+      message: 'Workout deleted successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 export default router;

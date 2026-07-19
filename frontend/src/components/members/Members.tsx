@@ -1,15 +1,19 @@
-import { Users, AlertTriangle, Plus, ChevronDown } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { Users, AlertTriangle, Plus, Loader2 } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { MemberFilters } from "./MemberFilters";
 import { MemberCard } from "./MemberCard";
-import { Member } from "@/types/member";
-import { Link } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { Member, MemberCounts } from "@/types/member";
 
 interface MembersProps {
   members: Member[];
   filteredMembers: Member[];
+  total: number;
   membersLoading: boolean;
+  isFetchingNextPage: boolean;
+  hasNextPage: boolean;
+  onLoadMore: () => void;
   membersError: string | null;
   searchTerm: string;
   setSearchTerm: (value: string) => void;
@@ -17,22 +21,23 @@ interface MembersProps {
   setStatusFilter: (value: string) => void;
   membershipFilter: string;
   setMembershipFilter: (value: string) => void;
-  memberCounts: any;
+  memberCounts: MemberCounts;
   onEdit: (m: Member) => void;
   onArchive: (id: string) => void;
   onDelete: (id: string) => void;
   onAdd: () => void;
   onActivate: (id: string) => Promise<void>;
   onDeactivate: (id: string) => Promise<void>;
-  // Optional server-driven pagination
-  onLoadMore?: () => void;
-  hasMore?: boolean;
 }
 
 export const Members = ({
   members,
   filteredMembers,
+  total,
   membersLoading,
+  isFetchingNextPage,
+  hasNextPage,
+  onLoadMore,
   membersError,
   searchTerm,
   setSearchTerm,
@@ -45,40 +50,27 @@ export const Members = ({
   onArchive,
   onDelete,
   onAdd,
-  onActivate, 
+  onActivate,
   onDeactivate,
-  onLoadMore,
-  hasMore
 }: MembersProps) => {
-  // If parent provides onLoadMore/hasMore we assume server-driven pagination
-  const serverDriven = typeof onLoadMore === 'function' && typeof hasMore === 'boolean';
+  // Sentinel element — triggers next page load when it scrolls into view
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
-  // Client-side fallback: incremental reveal
-  const [itemsToShow, setItemsToShow] = useState(10);
-  const itemsPerPage = 10;
-
-  // Reset client-side pagination when filters change
   useEffect(() => {
-    setItemsToShow(10);
-  }, [searchTerm, statusFilter, membershipFilter]);
-
-  const displayedMembers = serverDriven ? filteredMembers : filteredMembers.slice(0, itemsToShow);
-  const clientHasMore = itemsToShow < filteredMembers.length;
-
-  const handleShowMore = () => {
-    if (serverDriven) {
-      onLoadMore && onLoadMore();
-    } else {
-      setItemsToShow(prev => prev + itemsPerPage);
-    }
-  };
-
+    if (!sentinelRef.current) return;
+    const observer = new IntersectionObserver(
+      entries => { if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) onLoadMore(); },
+      { threshold: 0.1 }
+    );
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, onLoadMore]);
   return (
     <section>
-      <Link to="/" className="text-2xl font-bold mb-6 flex items-center gap-2 cursor-pointer">
+      <h2 className="text-2xl font-bold mb-6 flex items-center gap-2 cursor-default">
         <Users className="w-6 h-6 text-primary" />
         Member Management
-      </Link>
+      </h2>
 
       <MemberFilters
         searchTerm={searchTerm}
@@ -103,35 +95,36 @@ export const Members = ({
           <p className="text-muted-foreground">{membersError}</p>
         </div>
       ) : (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-            {displayedMembers.map((member) => (
-              <MemberCard
-                key={member.id}
-                member={member}
-                onEdit={onEdit}
-                onArchive={onArchive}
-                onDelete={onDelete}
-                onActivate={onActivate} 
-                onDeactivate={onDeactivate} 
-              />
-            ))}
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+          {filteredMembers.map((member) => (
+            <MemberCard
+              key={member.id}
+              member={member}
+              onEdit={onEdit}
+              onArchive={onArchive}
+              onDelete={onDelete}
+              onActivate={onActivate} 
+              onDeactivate={onDeactivate} 
+            />
+          ))}
+        </div>
+      )}
 
-          {hasMore && (
-            <div className="flex justify-center mt-8">
-              <Button 
-                variant="outline" 
-                size="lg" 
-                onClick={handleShowMore}
-                className="w-full max-w-xs"
-              >
-                <ChevronDown className="w-4 h-4 mr-2" />
-                Show More Members
-              </Button>
-            </div>
-          )}
-        </>
+      {/* Scroll sentinel — IntersectionObserver watches this to load next page */}
+      {!membersLoading && !membersError && <div ref={sentinelRef} className="h-4" />}
+
+      {/* Loading spinner while fetching next page */}
+      {isFetchingNextPage && (
+        <div className="flex justify-center py-6">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        </div>
+      )}
+
+      {/* Loaded-all indicator */}
+      {!membersLoading && !membersError && !hasNextPage && filteredMembers.length > 0 && (
+        <p className="text-center text-sm text-muted-foreground py-6">
+          All {filteredMembers.length} members loaded
+        </p>
       )}
 
       {!membersLoading && !membersError && filteredMembers.length === 0 && (
