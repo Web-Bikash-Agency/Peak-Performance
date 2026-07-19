@@ -4,7 +4,7 @@ import { Users, AlertTriangle, Plus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MemberFilters } from "./MemberFilters";
 import { MemberCard } from "./MemberCard";
-import { Member } from "@/types/member";
+import { Member, MemberCounts } from "@/types/member";
 
 interface MembersProps {
   members: Member[];
@@ -21,7 +21,7 @@ interface MembersProps {
   setStatusFilter: (value: string) => void;
   membershipFilter: string;
   setMembershipFilter: (value: string) => void;
-  memberCounts: any;
+  memberCounts: MemberCounts;
   onEdit: (m: Member) => void;
   onArchive: (id: string) => void;
   onDelete: (id: string) => void;
